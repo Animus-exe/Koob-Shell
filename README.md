@@ -1,3 +1,5 @@
+<div align="center">
+
 # Koob Shell
 
 [![CI](https://github.com/Animus-exe/Koob-Shell/actions/workflows/ci.yml/badge.svg)](https://github.com/Animus-exe/Koob-Shell/actions/workflows/ci.yml)
@@ -54,7 +56,7 @@ This repository is the SwiftPM source for Koob Shell. The executable product is 
 
 ```bash
 git clone https://github.com/Animus-exe/Koob-Shell.git
-cd mac-terminal-tracker
+cd Koob-Shell
 swift run
 ```
 
@@ -121,3 +123,5 @@ See [SECURITY.md](SECURITY.md) for how to report vulnerabilities.
 MIT — see [LICENSE](LICENSE). Third-party dependencies: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Created by [vurzumm](https://github.com/vurzumm).
+
+</div>
