@@ -10,14 +10,14 @@ All user configuration lives under:
 | --- | --- |
 | `appearance.json` | Active theme, gallery options, color overrides, custom themes |
 | `commands.json` | User command definitions (merged with plugin commands) |
-| `plugins/<id>/plugin.json` | Enabled plugin manifests and assets |
+| `plugins/<id>/plugin.json` | Plugin manifests (`isEnabled` toggle) and assets |
 | `plugins/<id>/…` | Plugin-specific files (rules, art, shell hooks, CLI) |
 | `bin/tracker` | Process tracking CLI (reinstalled on app launch) |
 | `bin/-help` | In-terminal help command |
 | `bin/koobshell` | Workflow Intelligence CLI (when that plugin is active) |
 | `tracker.sqlite3` | Process minutes, runtime state, and workflow sessions |
 
-Older installs under `MacTerminalTracker` are migrated automatically on launch.
+Older installs under `InKShell`, `MacTerminalTracker`, or `OrcShell` are migrated automatically on launch into `KoobShell`.
 
 ## Appearance
 
@@ -30,7 +30,7 @@ Older installs under `MacTerminalTracker` are migrated automatically on launch.
 - Gallery options: `galleryEnabled`, `galleryOpacity`, `galleryFullScreen`, `galleryIntervalSeconds`, `galleryRevolve`
 - `terminalOpacity`
 
-Prefer the Preferences window for day-to-day changes. Edit JSON only when you need something the UI does not expose.
+Prefer the Preferences window for day-to-day changes (including **Plugins** on/off). Edit JSON only when you need something the UI does not expose.
 
 ## Commands
 
@@ -44,4 +44,4 @@ Themes may set colors, font, padding, optional startup banner text, and border /
 
 The ASCII gallery plugin can show rotating art behind a semi-transparent terminal. Art files live in the plugin’s art directory (JSON payloads or plain text).
 
-**Personal art is gitignored** — your pieces under `Plugins/ascii-gallery/Ascii_art/` stay local and are not uploaded to GitHub. For formats, paths, Preferences settings, and a copy-paste template, see [Plugins/ascii-gallery/Ascii_art/README.md](../Plugins/ascii-gallery/Ascii_art/README.md).
+**Personal art is gitignored** — drop pieces in repo-root [`Ascii_art/`](../Ascii_art/README.md) and they stay local. Bundled Koob defaults live under `Plugins/ascii-gallery/Ascii_art/`.

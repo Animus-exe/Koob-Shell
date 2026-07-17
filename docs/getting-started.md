@@ -60,9 +60,9 @@ Notes:
 
 ## Preferences
 
-Open **Preferences…** from the terminal context menu (or the app menu when available) to adjust themes, terminal opacity, ASCII gallery options, and Workflow Intelligence settings.
+Open **Preferences…** from the terminal context menu (or the app menu when available) to adjust themes, terminal opacity, ASCII gallery options, **enable/disable plugins**, and Workflow Intelligence settings.
 
-To add your own gallery backdrops, see [Adding your own ASCII art](../Plugins/ascii-gallery/Ascii_art/README.md). Your art files are gitignored so they are not uploaded with the repo.
+To add your own gallery backdrops, drop files in [`Ascii_art/`](../Ascii_art/README.md) at the repo root. Your art files are gitignored so they are not uploaded with the repo.
 
 ## Local-only
 

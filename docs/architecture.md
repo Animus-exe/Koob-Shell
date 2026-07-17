@@ -5,7 +5,7 @@ Koob Shell is a SwiftPM executable (`KoobShell`) targeting macOS 14+, built with
 ## Layout
 
 ```text
-Sources/MacTerminalTracker/
+Sources/KoobShell/
   App/           App entry, preferences window
   ViewModels/    AppViewModel, TerminalSessionManager
   Views/         Terminal, tabs, inspector, chrome, preferences

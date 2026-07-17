@@ -45,7 +45,7 @@
       "id" : "git-ops",
       "name" : "Git Ops",
       "promptLabel" : "git",
-      "terminalPadding" : 14
+      "terminalPadding" : 0
     }
   ],
   "version" : "1.0.0"

@@ -101,6 +101,35 @@ struct PreferencesView: View {
                 }
             }
 
+            Section("Plugins") {
+                if viewModel.pluginStore.plugins.isEmpty {
+                    Text("No plugins installed. Bundled plugins are seeded into \(AppPaths.pluginsDirectory.path) on first launch.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(viewModel.pluginStore.plugins) { plugin in
+                        Toggle(isOn: pluginEnabledBinding(for: plugin.manifest.id)) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(plugin.manifest.name)
+                                Text(pluginContributionSummary(plugin.manifest))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+
+                if let loadError = viewModel.pluginStore.loadError {
+                    Text(loadError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+
+                Text("Disabled plugins stay installed but stop contributing themes, commands, gallery art, and workflow tools.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("ASCII Gallery") {
                 Toggle("Enable gallery", isOn: galleryEnabledBinding)
 
@@ -164,38 +193,10 @@ struct PreferencesView: View {
                     viewModel.appearanceStore.clearTitleBarOverrides()
                 }
             }
-
-            if viewModel.workflowRuntime.isActive {
-                Section("Workflow Intelligence") {
-                    Toggle("Show session inspector", isOn: workflowInspectorBinding)
-
-                    Toggle("Capture commands", isOn: workflowCaptureBinding)
-
-                    Picker("Destructive warnings", selection: workflowWarningsBinding) {
-                        ForEach(DestructiveWarningMode.allCases, id: \.self) { mode in
-                            Text(mode.rawValue.capitalized).tag(mode)
-                        }
-                    }
-
-                    Toggle("Auto-summary on shell exit", isOn: workflowAutoSummaryBinding)
-
-                    if let plugin = viewModel.workflowRuntime.activePlugin {
-                        Text("Plugin: \(plugin.manifest.name) v\(plugin.manifest.version)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if let error = viewModel.workflowRuntime.activationError {
-                        Text(error)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                }
-            }
         }
         .formStyle(.grouped)
-        .padding(20)
-        .frame(width: 460)
+        .padding(12)
+        .frame(width: 420)
     }
 
     private var resolvedTitleBar: ShellBorderStyle {
@@ -475,43 +476,32 @@ struct PreferencesView: View {
         )
     }
 
-    private var workflowInspectorBinding: Binding<Bool> {
+    private func pluginEnabledBinding(for pluginID: String) -> Binding<Bool> {
         Binding(
-            get: { viewModel.showWorkflowInspector },
-            set: { viewModel.showWorkflowInspector = $0 }
-        )
-    }
-
-    private var workflowCaptureBinding: Binding<Bool> {
-        Binding(
-            get: { viewModel.workflowRuntime.settings.captureEnabled },
+            get: {
+                viewModel.pluginStore.plugins.first(where: { $0.manifest.id == pluginID })?.manifest.isEnabled ?? false
+            },
             set: { enabled in
-                var settings = viewModel.workflowRuntime.settings
-                settings.captureEnabled = enabled
-                viewModel.updateWorkflowSettings(settings)
+                viewModel.setPluginEnabled(pluginID: pluginID, isEnabled: enabled)
             }
         )
     }
 
-    private var workflowWarningsBinding: Binding<DestructiveWarningMode> {
-        Binding(
-            get: { viewModel.workflowRuntime.settings.destructiveWarnings },
-            set: { mode in
-                var settings = viewModel.workflowRuntime.settings
-                settings.destructiveWarnings = mode
-                viewModel.updateWorkflowSettings(settings)
-            }
-        )
+    private func pluginContributionSummary(_ manifest: PluginManifest) -> String {
+        var parts: [String] = ["v\(manifest.version)"]
+        if !manifest.themes.isEmpty {
+            parts.append("\(manifest.themes.count) theme\(manifest.themes.count == 1 ? "" : "s")")
+        }
+        if !manifest.commands.isEmpty {
+            parts.append("\(manifest.commands.count) command\(manifest.commands.count == 1 ? "" : "s")")
+        }
+        if manifest.gallery != nil {
+            parts.append("gallery")
+        }
+        if manifest.workflow != nil {
+            parts.append("workflow")
+        }
+        return parts.joined(separator: " · ")
     }
 
-    private var workflowAutoSummaryBinding: Binding<Bool> {
-        Binding(
-            get: { viewModel.workflowRuntime.settings.autoSummaryOnExit },
-            set: { enabled in
-                var settings = viewModel.workflowRuntime.settings
-                settings.autoSummaryOnExit = enabled
-                viewModel.updateWorkflowSettings(settings)
-            }
-        )
-    }
 }

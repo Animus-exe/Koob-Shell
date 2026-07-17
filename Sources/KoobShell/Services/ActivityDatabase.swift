@@ -3,7 +3,7 @@ import SQLite3
 
 final class ActivityDatabase: @unchecked Sendable {
     private let dbPointer: OpaquePointer?
-    private let queue = DispatchQueue(label: "MacTerminalTracker.ActivityDatabase")
+    private let queue = DispatchQueue(label: "KoobShell.ActivityDatabase")
 
     init(path: URL) throws {
         try FileManager.default.createDirectory(at: AppPaths.appSupportDirectory, withIntermediateDirectories: true, attributes: nil)

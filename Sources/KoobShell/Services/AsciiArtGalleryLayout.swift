@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import os
 
 struct AsciiArtRenderLayout: Equatable, Sendable {
     let fontSize: CGFloat
@@ -14,6 +15,19 @@ enum AsciiArtGalleryLayout {
     private static let maximumFontSize: CGFloat = 4096
     private static let rotationCoverMultiplier = CGFloat(2).squareRoot()
     private static let refinementIterations = 14
+    private static let cacheLimit = 48
+
+    private struct CacheKey: Hashable, Sendable {
+        let artID: String
+        let widthBucket: Int
+        let heightBucket: Int
+        let isFullScreen: Bool
+        let revolves: Bool
+    }
+
+    private static let layoutCache = OSAllocatedUnfairLock(
+        initialState: [CacheKey: AsciiArtRenderLayout]()
+    )
 
     static func renderLayout(
         viewport: CGSize,
@@ -23,6 +37,17 @@ enum AsciiArtGalleryLayout {
     ) -> AsciiArtRenderLayout {
         guard viewport.width > 0, viewport.height > 0 else {
             return layout(for: referenceFontSize)
+        }
+
+        let key = CacheKey(
+            artID: art.id,
+            widthBucket: Int(viewport.width.rounded()),
+            heightBucket: Int(viewport.height.rounded()),
+            isFullScreen: isFullScreen,
+            revolves: revolves
+        )
+        if let cached = layoutCache.withLock({ $0[key] }) {
+            return cached
         }
 
         let target = dynamicTarget(
@@ -35,12 +60,23 @@ enum AsciiArtGalleryLayout {
         let measuredSize = measureArtSize(content: art.content, fontSize: fontSize)
         let residualScale = residualScaleToFit(measuredSize: measuredSize, target: target)
 
-        return AsciiArtRenderLayout(
+        let rendered = AsciiArtRenderLayout(
             fontSize: fontSize,
             lineSpacing: lineSpacing(for: fontSize),
             tracking: tracking(for: fontSize),
             residualScale: residualScale
         )
+        store(rendered, for: key)
+        return rendered
+    }
+
+    private static func store(_ layout: AsciiArtRenderLayout, for key: CacheKey) {
+        layoutCache.withLock { cache in
+            if cache.count >= cacheLimit {
+                cache.removeAll(keepingCapacity: true)
+            }
+            cache[key] = layout
+        }
     }
 
     static func dynamicFillRatio(for art: AsciiArtEntry, isFullScreen: Bool) -> CGFloat {

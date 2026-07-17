@@ -16,38 +16,82 @@ enum AsciiArtGallery {
         gallery: PluginGalleryDefinition,
         installedRoot: URL
     ) -> URL {
-        if let developmentDirectory = developmentArtDirectory(pluginID: pluginID, artDirectory: gallery.artDirectory) {
-            return developmentDirectory
+        resolveArtDirectories(pluginID: pluginID, gallery: gallery, installedRoot: installedRoot).first
+            ?? installedRoot.appendingPathComponent(gallery.artDirectory, isDirectory: true)
+    }
+
+    /// Preferred drop folder for personal art while developing from a checkout.
+    static let easyAddArtDirectoryName = "Ascii_art"
+
+    /// All art directories that contribute entries, highest priority first.
+    /// Root `Ascii_art/` is the easy drop zone; plugin / App Support / bundle follow.
+    static func resolveArtDirectories(
+        pluginID: String,
+        gallery: PluginGalleryDefinition,
+        installedRoot: URL
+    ) -> [URL] {
+        var directories: [URL] = []
+        var seen = Set<String>()
+
+        func appendIfPresent(_ url: URL) {
+            let path = url.standardizedFileURL.path
+            guard !seen.contains(path), FileManager.default.fileExists(atPath: path) else {
+                return
+            }
+            seen.insert(path)
+            directories.append(url)
         }
 
-        let installedDirectory = installedRoot.appendingPathComponent(gallery.artDirectory, isDirectory: true)
-        if FileManager.default.fileExists(atPath: installedDirectory.path) {
-            return installedDirectory
+        for root in developmentPackageRoots() {
+            appendIfPresent(root.appendingPathComponent(easyAddArtDirectoryName, isDirectory: true))
         }
+
+        if let developmentDirectory = developmentArtDirectory(pluginID: pluginID, artDirectory: gallery.artDirectory) {
+            appendIfPresent(developmentDirectory)
+        }
+
+        appendIfPresent(installedRoot.appendingPathComponent(gallery.artDirectory, isDirectory: true))
 
         if let bundledDirectory = bundledArtDirectory(pluginID: pluginID, artDirectory: gallery.artDirectory) {
-            return bundledDirectory
+            appendIfPresent(bundledDirectory)
         }
 
-        return installedDirectory
+        return directories
     }
 
     static func loadEntries(from directory: URL, fileManager: FileManager = .default) -> [AsciiArtEntry] {
-        guard let files = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else {
-            return []
+        loadEntries(from: [directory], fileManager: fileManager)
+    }
+
+    /// Loads art from multiple folders. Earlier directories win when filenames collide.
+    static func loadEntries(from directories: [URL], fileManager: FileManager = .default) -> [AsciiArtEntry] {
+        var byName: [String: AsciiArtEntry] = [:]
+        var order: [String] = []
+
+        for directory in directories {
+            guard let files = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else {
+                continue
+            }
+
+            let candidates = files
+                .filter { url in
+                    let ext = url.pathExtension.lowercased()
+                    return ext == "json" || ext.isEmpty
+                }
+                .sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
+
+            for url in candidates {
+                guard let data = try? Data(contentsOf: url) else { continue }
+                let name = url.deletingPathExtension().lastPathComponent
+                guard byName[name] == nil, let entry = AsciiArtEntry(data: data, name: name) else {
+                    continue
+                }
+                byName[name] = entry
+                order.append(name)
+            }
         }
 
-        return files
-            .filter { url in
-                let ext = url.pathExtension.lowercased()
-                return ext == "json" || ext.isEmpty
-            }
-            .sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
-            .compactMap { url in
-                guard let data = try? Data(contentsOf: url) else { return nil }
-                let name = url.deletingPathExtension().lastPathComponent
-                return AsciiArtEntry(data: data, name: name)
-            }
+        return order.compactMap { byName[$0] }
     }
 
     private static func positiveModulo(_ value: Int, _ modulus: Int) -> Int {
@@ -67,20 +111,31 @@ enum AsciiArtGallery {
         return nil
     }
 
-    private static func developmentPluginRoots() -> [URL] {
+    private static func developmentPackageRoots() -> [URL] {
         var roots: [URL] = []
+        var seen = Set<String>()
 
-        let currentDirectory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
-        roots.append(currentDirectory.appendingPathComponent("Plugins", isDirectory: true))
+        func append(_ url: URL) {
+            let path = url.standardizedFileURL.path
+            guard !seen.contains(path) else { return }
+            seen.insert(path)
+            roots.append(url)
+        }
+
+        append(URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true))
 
         let packageRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        roots.append(packageRoot.appendingPathComponent("Plugins", isDirectory: true))
+        append(packageRoot)
 
         return roots
+    }
+
+    private static func developmentPluginRoots() -> [URL] {
+        developmentPackageRoots().map { $0.appendingPathComponent("Plugins", isDirectory: true) }
     }
 
     private static func bundledArtDirectory(pluginID: String, artDirectory: String) -> URL? {

@@ -8,9 +8,9 @@ final class PreferencesWindowController {
     init(viewModel: AppViewModel) {
         let hostingController = NSHostingController(rootView: PreferencesView(viewModel: viewModel))
         let window = NSWindow(contentViewController: hostingController)
-        window.title = "Preferences"
+        window.title = "\(AppPaths.displayName) Preferences"
         window.identifier = NSUserInterfaceItemIdentifier(AppPaths.preferencesWindowIdentifier)
-        window.setContentSize(NSSize(width: 480, height: 580))
+        window.setContentSize(NSSize(width: 440, height: 540))
         window.styleMask = [.titled, .closable, .miniaturizable]
         window.isReleasedWhenClosed = false
         window.center()

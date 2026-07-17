@@ -28,7 +28,7 @@
       "id": "aurora-shell",
       "name": "Aurora Shell",
       "promptLabel": "shell",
-      "terminalPadding": 12
+      "terminalPadding": 0
     },
     {
       "accentColor": "#FB7185",
@@ -48,7 +48,7 @@
       "id": "ember-rim",
       "name": "Ember Rim",
       "promptLabel": "shell",
-      "terminalPadding": 12
+      "terminalPadding": 0
     },
     {
       "accentColor": "#94A3B8",
@@ -68,7 +68,7 @@
       "id": "frost-glass",
       "name": "Frost Glass",
       "promptLabel": "shell",
-      "terminalPadding": 10
+      "terminalPadding": 0
     }
   ],
   "version": "1.0.0"

@@ -5,7 +5,7 @@ import PackageDescription
 
 var targets: [Target] = [
     .executableTarget(
-        name: "MacTerminalTracker",
+        name: "KoobShell",
         dependencies: [
             .product(name: "SwiftTerm", package: "SwiftTerm"),
         ],
@@ -23,25 +23,25 @@ var targets: [Target] = [
 
 // Tests/ is gitignored — include the target only when present locally.
 let packageDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-let localTestsDirectory = packageDirectory.appendingPathComponent("Tests/MacTerminalTrackerTests")
+let localTestsDirectory = packageDirectory.appendingPathComponent("Tests/KoobShellTests")
 if FileManager.default.fileExists(atPath: localTestsDirectory.path) {
     targets.append(
         .testTarget(
-            name: "MacTerminalTrackerTests",
-            dependencies: ["MacTerminalTracker"]
+            name: "KoobShellTests",
+            dependencies: ["KoobShell"]
         )
     )
 }
 
 let package = Package(
-    name: "MacTerminalTracker",
+    name: "KoobShell",
     platforms: [
         .macOS(.v14),
     ],
     products: [
         .executable(
             name: "KoobShell",
-            targets: ["MacTerminalTracker"]
+            targets: ["KoobShell"]
         ),
     ],
     dependencies: [

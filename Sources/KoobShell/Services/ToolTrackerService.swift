@@ -11,6 +11,7 @@ final class ToolTrackerService {
     private let database: ActivityDatabase
     private var workspaceObservers: [NSObjectProtocol] = []
     private var refreshTimer: Timer?
+    private var pendingWorkspaceRefresh: DispatchWorkItem?
     private(set) var trackedTools: [TrackedTool] = []
     private(set) var summaries: [ToolUsageSummary] = []
     private(set) var runningToolIDs: Set<UUID> = []
@@ -34,17 +35,17 @@ final class ToolTrackerService {
         workspaceObservers = [
             workspace.addObserver(forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main) { [weak self] _ in
                 Task { @MainActor in
-                    self?.refreshRunningApplications()
+                    self?.scheduleWorkspaceRefresh()
                 }
             },
             workspace.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
                 Task { @MainActor in
-                    self?.refreshRunningApplications()
+                    self?.scheduleWorkspaceRefresh()
                 }
             },
         ]
 
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.refreshRunningApplications()
             }
@@ -52,6 +53,8 @@ final class ToolTrackerService {
     }
 
     func stop() {
+        pendingWorkspaceRefresh?.cancel()
+        pendingWorkspaceRefresh = nil
         refreshTimer?.invalidate()
         refreshTimer = nil
         workspaceObservers.forEach(NSWorkspace.shared.notificationCenter.removeObserver)
@@ -133,15 +136,18 @@ final class ToolTrackerService {
     }
 
     func refreshRunningApplications(date: Date = Date()) {
-        reloadTools()
-
         let apps = NSWorkspace.shared.runningApplications
         let appBundleIDs = Set(apps.compactMap(\.bundleIdentifier))
         let appLocalizedNames = Set(apps.compactMap { $0.localizedName?.lowercased() })
         let appExecutableNames = Set(
             apps.compactMap { $0.executableURL?.lastPathComponent.lowercased() }
         )
-        let processNames = ProcessSnapshot.runningExecutableNames()
+
+        // Avoid forking `/bin/ps` unless an enabled tool actually needs process-name matching.
+        let needsProcessSnapshot = trackedTools.contains {
+            $0.isEnabled && $0.matchType == .executableName
+        }
+        let processNames = needsProcessSnapshot ? ProcessSnapshot.runningExecutableNames() : []
 
         let active = Set(
             trackedTools
@@ -171,6 +177,15 @@ final class ToolTrackerService {
         } catch {
             Self.logger.error("Summary refresh failed: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    private func scheduleWorkspaceRefresh() {
+        pendingWorkspaceRefresh?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.refreshRunningApplications()
+        }
+        pendingWorkspaceRefresh = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
     }
 
     private func reloadTools() {

@@ -3,6 +3,7 @@ import SwiftTerm
 import SwiftUI
 
 struct TerminalTextView: NSViewRepresentable {
+    let paneID: UUID
     let theme: ThemeDefinition
     let appearance: AppearanceConfig
     let border: ShellBorderStyle
@@ -13,27 +14,33 @@ struct TerminalTextView: NSViewRepresentable {
     let workflowShellEnvironment: [String: String]
     let useWorkflowShellOverlay: Bool
     let isSelected: Bool
+    let canSplit: Bool
+    let canClosePane: Bool
     let focusToken: Int
     let onReady: @MainActor @Sendable () -> Void
     let onStartFailure: @MainActor @Sendable (String) -> Void
-    let onActivity: @MainActor @Sendable () -> Void
     let onExit: @MainActor @Sendable (Int32?) -> Void
     let onTitleChange: @MainActor @Sendable (String) -> Void
     let onDirectoryChange: @MainActor @Sendable (String?) -> Void
+    let onFocus: @MainActor @Sendable () -> Void
+    let onSplitVertically: @MainActor @Sendable () -> Void
+    let onSplitHorizontally: @MainActor @Sendable () -> Void
+    let onClosePane: @MainActor @Sendable () -> Void
     let onOpenPreferences: () -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
-            onActivity: onActivity,
             onExit: onExit,
             onTitleChange: onTitleChange,
             onDirectoryChange: onDirectoryChange
         )
     }
 
-    func makeNSView(context: Context) -> TerminalHostView {
-        let view = TerminalHostView()
-        view.update(
+    func makeNSView(context: Context) -> TerminalHostContainerView {
+        let container = TerminalHostContainerView()
+        let host = TerminalHostRegistry.host(for: paneID)
+        container.attach(host)
+        host.update(
             theme: theme,
             appearance: appearance,
             border: border,
@@ -44,21 +51,28 @@ struct TerminalTextView: NSViewRepresentable {
             workflowShellEnvironment: workflowShellEnvironment,
             useWorkflowShellOverlay: useWorkflowShellOverlay,
             isSelected: isSelected,
+            canSplit: canSplit,
+            canClosePane: canClosePane,
             focusToken: focusToken,
             coordinator: context.coordinator,
             onReady: onReady,
             onStartFailure: onStartFailure,
+            onFocus: onFocus,
+            onSplitVertically: onSplitVertically,
+            onSplitHorizontally: onSplitHorizontally,
+            onClosePane: onClosePane,
             onOpenPreferences: onOpenPreferences
         )
-        return view
+        return container
     }
 
-    func updateNSView(_ nsView: TerminalHostView, context: Context) {
-        context.coordinator.onActivity = onActivity
+    func updateNSView(_ nsView: TerminalHostContainerView, context: Context) {
+        let host = TerminalHostRegistry.host(for: paneID)
+        nsView.attach(host)
         context.coordinator.onExit = onExit
         context.coordinator.onTitleChange = onTitleChange
         context.coordinator.onDirectoryChange = onDirectoryChange
-        nsView.update(
+        host.update(
             theme: theme,
             appearance: appearance,
             border: border,
@@ -69,27 +83,34 @@ struct TerminalTextView: NSViewRepresentable {
             workflowShellEnvironment: workflowShellEnvironment,
             useWorkflowShellOverlay: useWorkflowShellOverlay,
             isSelected: isSelected,
+            canSplit: canSplit,
+            canClosePane: canClosePane,
             focusToken: focusToken,
             coordinator: context.coordinator,
             onReady: onReady,
             onStartFailure: onStartFailure,
+            onFocus: onFocus,
+            onSplitVertically: onSplitVertically,
+            onSplitHorizontally: onSplitHorizontally,
+            onClosePane: onClosePane,
             onOpenPreferences: onOpenPreferences
         )
     }
 
+    static func dismantleNSView(_ nsView: TerminalHostContainerView, coordinator: Coordinator) {
+        nsView.detachHost()
+    }
+
     final class Coordinator: NSObject, LocalProcessTerminalViewDelegate {
-        var onActivity: @MainActor @Sendable () -> Void
         var onExit: @MainActor @Sendable (Int32?) -> Void
         var onTitleChange: @MainActor @Sendable (String) -> Void
         var onDirectoryChange: @MainActor @Sendable (String?) -> Void
 
         init(
-            onActivity: @escaping @MainActor @Sendable () -> Void,
             onExit: @escaping @MainActor @Sendable (Int32?) -> Void,
             onTitleChange: @escaping @MainActor @Sendable (String) -> Void,
             onDirectoryChange: @escaping @MainActor @Sendable (String?) -> Void
         ) {
-            self.onActivity = onActivity
             self.onExit = onExit
             self.onTitleChange = onTitleChange
             self.onDirectoryChange = onDirectoryChange
@@ -133,7 +154,12 @@ final class TerminalHostView: NSView {
     private var lastTerminalTitle = AppPaths.displayName
     private var lastWorkingDirectory: String?
     private var lastFocusToken = -1
+    private var lastWasSelected = false
+    private var lastAppliedInset: CGFloat = -1
     private var isSelected = false
+    private var isApplyingFocus = false
+    private var focusEventMonitor: Any?
+    private var paneFocusHandler: (() -> Void)?
     private var terminalInset = CGFloat(ThemeDefinition.fallback.terminalPadding)
 
     var trackerTerminalView: TrackerTerminalView {
@@ -176,6 +202,7 @@ final class TerminalHostView: NSView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         configureWindowIfNeeded()
+        updateFocusEventMonitor()
         if isSelected {
             becomeActiveTerminal()
         }
@@ -192,37 +219,81 @@ final class TerminalHostView: NSView {
         workflowShellEnvironment: [String: String],
         useWorkflowShellOverlay: Bool,
         isSelected: Bool,
+        canSplit: Bool,
+        canClosePane: Bool,
         focusToken: Int,
         coordinator: TerminalTextView.Coordinator,
         onReady: @escaping () -> Void,
         onStartFailure: @escaping (String) -> Void,
+        onFocus: @escaping () -> Void,
+        onSplitVertically: @escaping () -> Void,
+        onSplitHorizontally: @escaping () -> Void,
+        onClosePane: @escaping () -> Void,
         onOpenPreferences: @escaping () -> Void
     ) {
         self.isSelected = isSelected
         terminalView.processDelegate = coordinator
-        terminalView.activityHandler = coordinator.onActivity
+        paneFocusHandler = onFocus
+        terminalView.splitVerticallyHandler = onSplitVertically
+        terminalView.splitHorizontallyHandler = onSplitHorizontally
+        terminalView.closePaneHandler = onClosePane
+        terminalView.canSplit = canSplit
+        terminalView.canClosePane = canClosePane
         terminalView.preferencesHandler = onOpenPreferences
-        terminalView.configure(
-            theme: theme,
-            appearance: appearance,
-            border: border,
-            workflowSessionID: workflowSessionID,
-            workflowShellEnvironment: workflowShellEnvironment,
-            useWorkflowShellOverlay: useWorkflowShellOverlay
-        )
-        terminalInset = CGFloat(max(theme.terminalPadding, 0))
-        applyChrome(theme: theme, appearance: appearance, border: border)
+
+        let themeChanged = lastThemeID != theme.id
+            || lastAppearance != appearance
+            || lastBorder != border
+            || lastTitleBar != titleBar
+        let inset = CGFloat(min(max(theme.terminalPadding, 0), 2))
+        let insetChanged = inset != lastAppliedInset
+        let metadataChanged = lastTerminalTitle != terminalTitle
+            || lastWorkingDirectory != currentWorkingDirectory
+        let selectionChanged = lastWasSelected != isSelected
+
+        if themeChanged || !didStartProcess {
+            terminalView.configure(
+                theme: theme,
+                appearance: appearance,
+                border: border,
+                workflowSessionID: workflowSessionID,
+                workflowShellEnvironment: workflowShellEnvironment,
+                useWorkflowShellOverlay: useWorkflowShellOverlay
+            )
+        } else {
+            terminalView.updateWorkflowContext(
+                workflowSessionID: workflowSessionID,
+                workflowShellEnvironment: workflowShellEnvironment,
+                useWorkflowShellOverlay: useWorkflowShellOverlay
+            )
+        }
+
+        terminalInset = inset
+        if themeChanged || insetChanged {
+            applyChrome(theme: theme, appearance: appearance, border: border, forceLayout: insetChanged)
+            lastAppliedInset = inset
+        }
+
+        updateFocusEventMonitor()
 
         if isSelected {
-            applyWindowChrome(border: border, titleBar: titleBar)
-            applyWindowMetadata(title: terminalTitle, currentWorkingDirectory: currentWorkingDirectory)
-            becomeActiveTerminal()
+            if selectionChanged || themeChanged {
+                applyWindowChrome(border: border, titleBar: titleBar)
+            }
+            if selectionChanged || metadataChanged {
+                applyWindowMetadata(title: terminalTitle, currentWorkingDirectory: currentWorkingDirectory)
+            }
+            if selectionChanged || ActiveTerminalRegistry.current !== terminalView {
+                becomeActiveTerminal()
+            }
             if focusToken != lastFocusToken {
                 lastFocusToken = focusToken
                 DispatchQueue.main.async { [weak self] in
                     self?.focusTerminal()
                 }
             }
+        } else if selectionChanged {
+            removeFocusEventMonitor()
         }
 
         if !didStartProcess {
@@ -238,7 +309,7 @@ final class TerminalHostView: NSView {
                 didStartProcess = true
                 configureScrollbackIfNeeded()
             }
-        } else if lastThemeID != theme.id || lastAppearance != appearance || lastBorder != border || lastTitleBar != titleBar {
+        } else if themeChanged {
             terminalView.needsDisplay = true
         }
 
@@ -248,6 +319,7 @@ final class TerminalHostView: NSView {
         lastTitleBar = titleBar
         lastTerminalTitle = terminalTitle
         lastWorkingDirectory = currentWorkingDirectory
+        lastWasSelected = isSelected
     }
 
     private func configureScrollbackIfNeeded() {
@@ -262,8 +334,46 @@ final class TerminalHostView: NSView {
 
     private func focusTerminal() {
         guard isSelected, let window else { return }
+        isApplyingFocus = true
+        defer { isApplyingFocus = false }
         window.makeFirstResponder(terminalView)
         ActiveTerminalRegistry.setCurrent(terminalView)
+    }
+
+    private func updateFocusEventMonitor() {
+        guard isSelected, window != nil else {
+            removeFocusEventMonitor()
+            return
+        }
+        if focusEventMonitor != nil {
+            return
+        }
+
+        focusEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self, !self.isApplyingFocus, let window = self.window, event.window == window else {
+                return event
+            }
+            let location = self.convert(event.locationInWindow, from: nil)
+            if self.bounds.contains(location) {
+                self.paneFocusHandler?()
+            }
+            return event
+        }
+    }
+
+    private func removeFocusEventMonitor() {
+        if let focusEventMonitor {
+            NSEvent.removeMonitor(focusEventMonitor)
+            self.focusEventMonitor = nil
+        }
+    }
+
+    func prepareForRemoval() {
+        removeFocusEventMonitor()
+        if ActiveTerminalRegistry.current === terminalView {
+            ActiveTerminalRegistry.setCurrent(nil)
+        }
+        terminalView.terminateProcessIfNeeded()
     }
 
     private func configureWindowIfNeeded() {
@@ -282,16 +392,23 @@ final class TerminalHostView: NSView {
         WindowChromeConfigurator.apply(to: window, titleBar: titleBar, border: border)
     }
 
-    private func applyChrome(theme: ThemeDefinition, appearance: AppearanceConfig, border: ShellBorderStyle) {
+    private func applyChrome(
+        theme: ThemeDefinition,
+        appearance: AppearanceConfig,
+        border: ShellBorderStyle,
+        forceLayout: Bool
+    ) {
         applyShellTheme(theme: theme, appearance: appearance, border: border)
-        terminalSurfaceView.layer?.cornerRadius = 10
+        let radius: CGFloat = terminalInset > 0 ? 2 : 0
+        terminalSurfaceView.layer?.cornerRadius = radius
         terminalSurfaceView.layer?.cornerCurve = .continuous
-        terminalSurfaceView.layer?.shadowColor = NSColor.black.cgColor
-        terminalSurfaceView.layer?.shadowOpacity = 0.08
-        terminalSurfaceView.layer?.shadowRadius = 12
-        terminalSurfaceView.layer?.shadowOffset = NSSize(width: 0, height: -2)
+        terminalSurfaceView.layer?.shadowOpacity = 0
+        terminalSurfaceView.layer?.shadowRadius = 0
+        terminalSurfaceView.layer?.shadowOffset = .zero
         terminalSurfaceView.layer?.masksToBounds = false
-        needsLayout = true
+        if forceLayout {
+            needsLayout = true
+        }
     }
 
     private func applyShellTheme(theme: ThemeDefinition, appearance: AppearanceConfig, border: ShellBorderStyle) {
@@ -303,13 +420,19 @@ final class TerminalHostView: NSView {
 
         if border.usesCustomShellChrome {
             let primary = resolvedShellColor(hex: border.primaryColor) ?? themeBackground
-            terminalSurfaceView.layer?.borderWidth = 1
+            terminalSurfaceView.layer?.borderWidth = 0.5
             terminalSurfaceView.layer?.borderColor = primary.withAlphaComponent(shellOpacity).cgColor
             return
         }
 
-        terminalSurfaceView.layer?.borderWidth = 1
-        terminalSurfaceView.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.35).cgColor
+        // Flush terminals skip the card border; slight inset keeps a hairline separator.
+        if terminalInset > 0 {
+            terminalSurfaceView.layer?.borderWidth = 0.5
+            terminalSurfaceView.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.28).cgColor
+        } else {
+            terminalSurfaceView.layer?.borderWidth = 0
+            terminalSurfaceView.layer?.borderColor = nil
+        }
     }
 
     private func resolvedShellColor(hex: String?) -> NSColor? {
@@ -340,13 +463,25 @@ final class TrackerTerminalView: LocalProcessTerminalView, NSMenuItemValidation 
         case alreadyStarted
     }
 
-    var activityHandler: (@MainActor @Sendable () -> Void)?
+    var splitVerticallyHandler: (() -> Void)?
+    var splitHorizontallyHandler: (() -> Void)?
+    var closePaneHandler: (() -> Void)?
     var preferencesHandler: (() -> Void)?
+    var canSplit = true
+    var canClosePane = false
 
     private var shellStarted = false
     private var workflowSessionID = UUID().uuidString
     private var workflowShellEnvironment: [String: String] = [:]
     private var useWorkflowShellOverlay = false
+    private var lastConfiguredThemeID = ""
+    private var lastConfiguredAppearance = AppearanceConfig.fallback
+    private var lastConfiguredFontName = ""
+    private var lastConfiguredFontSize: Double = 0
+    private var lastConfiguredForeground = ""
+    private var lastConfiguredBackground = ""
+    private var lastConfiguredAccent = ""
+    private var lastConfiguredOpacity: Double = -1
 
     override var isOpaque: Bool {
         false
@@ -363,6 +498,16 @@ final class TrackerTerminalView: LocalProcessTerminalView, NSMenuItemValidation 
         configureBehavior()
     }
 
+    func updateWorkflowContext(
+        workflowSessionID: String,
+        workflowShellEnvironment: [String: String],
+        useWorkflowShellOverlay: Bool
+    ) {
+        self.workflowSessionID = workflowSessionID
+        self.workflowShellEnvironment = workflowShellEnvironment
+        self.useWorkflowShellOverlay = useWorkflowShellOverlay
+    }
+
     func configure(
         theme: ThemeDefinition,
         appearance: AppearanceConfig,
@@ -371,9 +516,22 @@ final class TrackerTerminalView: LocalProcessTerminalView, NSMenuItemValidation 
         workflowShellEnvironment: [String: String],
         useWorkflowShellOverlay: Bool
     ) {
-        self.workflowSessionID = workflowSessionID
-        self.workflowShellEnvironment = workflowShellEnvironment
-        self.useWorkflowShellOverlay = useWorkflowShellOverlay
+        updateWorkflowContext(
+            workflowSessionID: workflowSessionID,
+            workflowShellEnvironment: workflowShellEnvironment,
+            useWorkflowShellOverlay: useWorkflowShellOverlay
+        )
+
+        let themeChanged = lastConfiguredThemeID != theme.id
+            || lastConfiguredFontName != theme.fontName
+            || lastConfiguredFontSize != theme.fontSize
+            || lastConfiguredForeground != theme.foregroundColor
+            || lastConfiguredBackground != theme.backgroundColor
+            || lastConfiguredAccent != theme.accentColor
+            || lastConfiguredOpacity != appearance.terminalOpacity
+            || lastConfiguredAppearance != appearance
+
+        guard themeChanged else { return }
 
         let foregroundColor = NSColor(hex: theme.foregroundColor) ?? .textColor
         let backgroundColor = NSColor(hex: theme.backgroundColor) ?? .textBackgroundColor
@@ -385,9 +543,17 @@ final class TrackerTerminalView: LocalProcessTerminalView, NSMenuItemValidation 
         layer?.backgroundColor = nativeBackgroundColor.cgColor
         caretColor = accentColor
         selectedTextBackgroundColor = accentColor.withAlphaComponent(0.28)
-        layer?.cornerRadius = 10
-        layer?.cornerCurve = .continuous
+        layer?.cornerRadius = 0
         layer?.masksToBounds = true
+
+        lastConfiguredThemeID = theme.id
+        lastConfiguredAppearance = appearance
+        lastConfiguredFontName = theme.fontName
+        lastConfiguredFontSize = theme.fontSize
+        lastConfiguredForeground = theme.foregroundColor
+        lastConfiguredBackground = theme.backgroundColor
+        lastConfiguredAccent = theme.accentColor
+        lastConfiguredOpacity = appearance.terminalOpacity
     }
 
     func startShellIfNeeded(currentWorkingDirectory: String?) -> ShellStartOutcome {
@@ -421,24 +587,6 @@ final class TrackerTerminalView: LocalProcessTerminalView, NSMenuItemValidation 
 
         shellStarted = true
         return .started
-    }
-
-    override func dataReceived(slice: ArraySlice<UInt8>) {
-        if let activityHandler {
-            Task { @MainActor in
-                activityHandler()
-            }
-        }
-        super.dataReceived(slice: slice)
-    }
-
-    override func send(source: TerminalView, data: ArraySlice<UInt8>) {
-        if let activityHandler {
-            Task { @MainActor in
-                activityHandler()
-            }
-        }
-        super.send(source: source, data: data)
     }
 
     @objc
@@ -487,6 +635,35 @@ final class TrackerTerminalView: LocalProcessTerminalView, NSMenuItemValidation 
 
         menu.addItem(.separator())
 
+        let splitVerticalItem = NSMenuItem(
+            title: "Split Vertically",
+            action: #selector(splitVertically(_:)),
+            keyEquivalent: ""
+        )
+        splitVerticalItem.target = self
+        splitVerticalItem.isEnabled = canSplit
+        menu.addItem(splitVerticalItem)
+
+        let splitHorizontalItem = NSMenuItem(
+            title: "Split Horizontally",
+            action: #selector(splitHorizontally(_:)),
+            keyEquivalent: ""
+        )
+        splitHorizontalItem.target = self
+        splitHorizontalItem.isEnabled = canSplit
+        menu.addItem(splitHorizontalItem)
+
+        let closePaneItem = NSMenuItem(
+            title: "Close Pane",
+            action: #selector(closePane(_:)),
+            keyEquivalent: ""
+        )
+        closePaneItem.target = self
+        closePaneItem.isEnabled = canClosePane
+        menu.addItem(closePaneItem)
+
+        menu.addItem(.separator())
+
         let findItem = NSMenuItem(title: "Find…", action: #selector(showFindPanel(_:)), keyEquivalent: "")
         findItem.target = self
         menu.addItem(findItem)
@@ -508,6 +685,10 @@ final class TrackerTerminalView: LocalProcessTerminalView, NSMenuItemValidation 
             return true
         case #selector(paste(_:)):
             return true
+        case #selector(splitVertically(_:)), #selector(splitHorizontally(_:)):
+            return canSplit
+        case #selector(closePane(_:)):
+            return canClosePane
         case #selector(showFindPanel(_:)):
             return true
         case #selector(openPreferences(_:)):
@@ -525,8 +706,29 @@ final class TrackerTerminalView: LocalProcessTerminalView, NSMenuItemValidation 
     }
 
     @objc
+    private func splitVertically(_ sender: Any?) {
+        splitVerticallyHandler?()
+    }
+
+    @objc
+    private func splitHorizontally(_ sender: Any?) {
+        splitHorizontallyHandler?()
+    }
+
+    @objc
+    private func closePane(_ sender: Any?) {
+        closePaneHandler?()
+    }
+
+    @objc
     private func openPreferences(_ sender: Any?) {
         preferencesHandler?()
+    }
+
+    func terminateProcessIfNeeded() {
+        guard shellStarted else { return }
+        terminate()
+        shellStarted = false
     }
 
     private func configureBehavior() {
@@ -542,7 +744,7 @@ final class TrackerTerminalView: LocalProcessTerminalView, NSMenuItemValidation 
         environment["TERM"] = "xterm-256color"
         environment["COLORTERM"] = "truecolor"
         environment["TERM_PROGRAM"] = AppPaths.appName
-        environment["TERM_PROGRAM_VERSION"] = "1.0"
+        environment["TERM_PROGRAM_VERSION"] = "0.001.0"
         environment["TERM_SESSION_ID"] = workflowSessionID
         environment["CLICOLOR"] = "1"
 

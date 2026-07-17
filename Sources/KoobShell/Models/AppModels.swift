@@ -147,7 +147,7 @@ struct ThemeDefinition: Codable, Identifiable, Hashable, Sendable {
             foregroundColor: "#E8E8E6",
             backgroundColor: "#171717",
             accentColor: "#91D462",
-            terminalPadding: 10,
+            terminalPadding: 0,
             fontName: "Menlo",
             fontSize: 13
         ),
@@ -167,7 +167,7 @@ struct ThemeDefinition: Codable, Identifiable, Hashable, Sendable {
             foregroundColor: "#1F2937",
             backgroundColor: "#F9FAFB",
             accentColor: "#0F766E",
-            terminalPadding: 10,
+            terminalPadding: 0,
             fontName: "Menlo",
             fontSize: 13
         ),
@@ -188,7 +188,7 @@ struct ThemeDefinition: Codable, Identifiable, Hashable, Sendable {
             foregroundColor: "#D1FAE5",
             backgroundColor: "#052E16",
             accentColor: "#34D399",
-            terminalPadding: 10,
+            terminalPadding: 0,
             fontName: "Menlo",
             fontSize: 13
         ),
@@ -517,7 +517,7 @@ struct WorkflowUIConfig: Codable, Hashable, Sendable {
     var defaultPanelWidth: Double
 
     static let `default` = WorkflowUIConfig(
-        inspectorPanelEnabled: true,
+        inspectorPanelEnabled: false,
         defaultPanelWidth: 320
     )
 }

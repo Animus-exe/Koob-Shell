@@ -34,7 +34,7 @@ Optional contributions:
 | `gallery` | ASCII art directory for the backdrop gallery |
 | `workflow` | Workflow Intelligence capability (see [workflow-intelligence.md](workflow-intelligence.md)) |
 
-Set `"isEnabled": false` to disable a plugin without deleting it.
+Toggle plugins on or off in **Preferences → Plugins**. That updates `isEnabled` in the plugin’s `plugin.json` without deleting the install. You can also edit `"isEnabled": false` by hand if you prefer.
 
 ## Command entry example
 
@@ -66,7 +66,7 @@ Set `"isEnabled": false` to disable a plugin without deleting it.
 | --- | --- |
 | **Git Helper Pack** | Sample commands and a theme |
 | **Shell Theme Pack** | Extra themes |
-| **ASCII Gallery** | Rotating art behind the terminal ([add your own](../Plugins/ascii-gallery/Ascii_art/README.md)) |
+| **ASCII Gallery** | Rotating art behind the terminal ([add your own](../Ascii_art/README.md)) |
 | **Workflow Intelligence** | Session capture and `koobshell` CLI |
 
 Repo copies of plugin sources live under [`Plugins/`](../Plugins/) and are copied into Application Support when seeded.

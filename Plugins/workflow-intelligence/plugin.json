@@ -58,7 +58,7 @@
     },
     "ui": {
       "defaultPanelWidth": 320,
-      "inspectorPanelEnabled": true
+      "inspectorPanelEnabled": false
     }
   }
 }

@@ -41,7 +41,15 @@ struct ShellWindowReader: NSViewRepresentable {
 
 @MainActor
 enum ShellWindowChromeApplier {
+  private struct AppliedChrome: Equatable {
+    let themeID: String
+    let themeBackground: String
+    let border: ShellBorderStyle
+    let titleBar: ShellBorderStyle
+  }
+
   private static var overlays: [ObjectIdentifier: TitleBarChromeOverlayView] = [:]
+  private static var lastApplied: [ObjectIdentifier: AppliedChrome] = [:]
 
   static func apply(
     window: NSWindow,
@@ -49,9 +57,19 @@ enum ShellWindowChromeApplier {
     border: ShellBorderStyle,
     titleBar: ShellBorderStyle
   ) {
+    let key = ObjectIdentifier(window)
+    let signature = AppliedChrome(
+      themeID: theme.id,
+      themeBackground: theme.backgroundColor,
+      border: border,
+      titleBar: titleBar
+    )
+    if lastApplied[key] == signature {
+      return
+    }
+
     WindowChromeConfigurator.apply(to: window, titleBar: titleBar, border: border)
 
-    let key = ObjectIdentifier(window)
     guard titleBar.usesCustomShellChrome else {
       if let existing = overlays[key] {
         if let token = existing.windowResizeObserver {
@@ -60,6 +78,7 @@ enum ShellWindowChromeApplier {
         existing.removeFromSuperview()
       }
       overlays.removeValue(forKey: key)
+      lastApplied[key] = signature
       return
     }
 
@@ -99,12 +118,16 @@ enum ShellWindowChromeApplier {
       }
       overlay.windowResizeObserver = token
     }
+
+    lastApplied[key] = signature
   }
 }
 
 @MainActor
 final class TitleBarChromeOverlayView: NSView {
   private let fillLayer = CAGradientLayer()
+  private var lastStyle: ShellBorderStyle?
+  private var lastThemeBackgroundHex: String?
   var heightConstraint: NSLayoutConstraint?
   var windowResizeObserver: NSObjectProtocol?
 
@@ -124,6 +147,11 @@ final class TitleBarChromeOverlayView: NSView {
   }
 
   func apply(style: ShellBorderStyle, themeBackgroundHex: String) {
+    if lastStyle == style, lastThemeBackgroundHex == themeBackgroundHex {
+      return
+    }
+    lastStyle = style
+    lastThemeBackgroundHex = themeBackgroundHex
     isHidden = !style.usesCustomShellChrome
     ShellStyleLayer.apply(style: style, themeBackgroundHex: themeBackgroundHex, to: fillLayer)
     fillLayer.frame = bounds
@@ -152,14 +180,22 @@ enum WindowChromeConfigurator {
     ].contains(true)
 
     if usesCustomChrome {
-      window.styleMask.insert(.fullSizeContentView)
-      window.titlebarAppearsTransparent = true
-      window.titlebarSeparatorStyle = .none
-      window.toolbarStyle = .unified
-      window.isOpaque = false
-      window.backgroundColor = .clear
-      window.isMovableByWindowBackground = true
-    } else {
+      if !window.styleMask.contains(.fullSizeContentView)
+        || !window.titlebarAppearsTransparent
+        || window.isOpaque
+      {
+        window.styleMask.insert(.fullSizeContentView)
+        window.titlebarAppearsTransparent = true
+        window.titlebarSeparatorStyle = .none
+        window.toolbarStyle = .unified
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.isMovableByWindowBackground = true
+      }
+    } else if window.styleMask.contains(.fullSizeContentView)
+      || window.titlebarAppearsTransparent
+      || !window.isOpaque
+    {
       window.styleMask.remove(.fullSizeContentView)
       window.titlebarAppearsTransparent = false
       window.titlebarSeparatorStyle = .automatic

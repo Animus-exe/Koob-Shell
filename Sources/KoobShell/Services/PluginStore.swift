@@ -37,6 +37,23 @@ final class PluginStore {
         }
     }
 
+    /// Persists `isEnabled` on the plugin's `plugin.json` and updates the in-memory catalog.
+    func setEnabled(pluginID: String, isEnabled: Bool) throws {
+        guard let index = plugins.firstIndex(where: { $0.manifest.id == pluginID }) else {
+            throw PluginStoreError.pluginNotFound(pluginID)
+        }
+
+        var plugin = plugins[index]
+        guard plugin.manifest.isEnabled != isEnabled else {
+            return
+        }
+
+        plugin.manifest.isEnabled = isEnabled
+        let data = try PluginCodec.encode(plugin.manifest)
+        try data.write(to: plugin.manifestURL, options: .atomic)
+        plugins[index] = plugin
+    }
+
     private func ensurePluginFiles() throws {
         let fileManager = FileManager.default
         try fileManager.createDirectory(at: AppPaths.pluginsDirectory, withIntermediateDirectories: true, attributes: nil)
@@ -134,5 +151,16 @@ final class PluginStore {
         }
 
         try fileManager.copyItem(at: source, to: destination)
+    }
+}
+
+enum PluginStoreError: LocalizedError {
+    case pluginNotFound(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .pluginNotFound(let id):
+            return "Plugin not found: \(id)"
+        }
     }
 }

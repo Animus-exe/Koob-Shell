@@ -1,21 +1,48 @@
 # Koob Shell
 
-[![CI](https://github.com/vurzumm/mac-terminal-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/vurzumm/mac-terminal-tracker/actions/workflows/ci.yml)
+[![CI](https://github.com/Animus-exe/Koob-Shell/actions/workflows/ci.yml/badge.svg)](https://github.com/Animus-exe/Koob-Shell/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Star this repo](https://img.shields.io/github/stars/Animus-exe/Koob-Shell?style=social)](https://github.com/Animus-exe/Koob-Shell)
 
-`Koob Shell` is a lightweight native macOS terminal app built with SwiftUI.
+[![ORC Torrent](https://img.shields.io/badge/ORC%20Torrent-BitTorrent%20client-111111?style=for-the-badge&logo=github&logoColor=white)](https://github.com/The-animus-project/Orc-Torrent)
 
-This repository (`mac-terminal-tracker`) is the SwiftPM source for the **Koob Shell** app. The executable product is named `KoobShell`.
+```text
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⣤⣤⣿⣿⣿⣿⣿⣤⣤⣀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⡀⣀⣀⣤⣤⣶⣶⢶⡿⣿⣟⣿⣻⢿⣽⣳⣟⣾⣳⢯⣟⣿⣻⢿⣿⣿⣶⣾⣤⣶⣤⣤⣀⣀⠀⠀⠀
+⣿⣿⣿⡿⣿⣽⣞⡵⣯⢯⡽⣶⢻⡶⢯⣟⣾⣳⣟⡾⣽⣻⣞⡷⣯⡿⣞⣷⣯⣟⣿⣻⣽⣿⣿⣿⣿⣿⡗
+⢸⣿⣳⡻⣭⢻⡜⡻⢗⢯⢿⣵⢯⣟⣟⡾⣵⣻⢾⣽⣳⣟⡾⣽⢷⣻⣟⣾⣷⣿⣾⣿⣿⣿⣿⣿⣿⣿⡇
+⢸⣷⣏⠷⣭⣓⢮⡱⢍⠲⣀⠎⡉⠘⠋⠟⠷⢯⣟⣾⣳⣯⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇
+⠰⣿⣎⡟⡶⣩⠖⡱⢊⡱⢠⢂⠡⠊⠄⠀⠀⠀⠈⣽⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠃
+⠀⣿⢼⡹⢖⡣⡝⢢⠣⡐⠡⢂⠐⢀⠂⠀⠁⠀⠀⣽⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀
+⠀⣟⢧⡏⢧⡓⣌⠣⢒⠡⢁⠂⠌⠀⠀⠀⠀⠀⠀⣽⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀
+⠀⢹⣳⢚⡥⢓⠬⡑⠌⢂⠁⠂⠄⠀⠀⠀⠀⠀⠀⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡏⠀
+⠀⢸⣇⠯⡜⣡⠚⠤⢉⡐⢈⠀⡀⠀⠀⠀⠀⠀⠀⢼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⠀
+⠀⢨⣝⡚⠴⣡⠊⡔⠡⢀⠂⠀⠀⠀⠀⠀⠀⠀⠀⢺⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⠀
+⠀⢈⡧⣍⠳⣀⠣⠄⡁⠂⠀⠀⠀⠀⠀⠀⠀⠀⠀⢺⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠆⠀
+⠀⠀⡷⣌⠣⢄⠃⠌⡀⠠⠁⠀⠀⠀⠀⠀⠀⠀⠀⢹⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠃⠀
+⠀⠀⡷⣌⠣⡌⢌⠂⠄⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⢺⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀
+⠀⠀⠙⡾⣗⡸⣂⠱⡈⢄⠂⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠋⠀⠀
+⠀⠀⠀⠈⠘⠹⣳⢧⡑⢦⠐⠠⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠛⠉⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠈⠀⢹⠓⣬⠑⡄⠀⠀⠀⠀⠀⠀⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠋⠁⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⠫⣟⠶⣌⡀⢀⠀⠀⠀⣸⣿⣿⣿⣿⣿⣿⡿⠛⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠺⢽⣦⣄⣀⠀⣿⣿⣿⣿⡿⠛⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠙⠓⠹⠟⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+```
+
+**Koob Shell** is a heavily customisable native terminal for macOS.
+
+The point of the project is not another fixed-feature terminal — it is a base you shape yourself. New capabilities ship as **plugins**, so you can mix themes, visuals, and tools and effectively **build your own terminal**: highly visually customisable, and just as customisable in what it can do.
+
+This repository is the SwiftPM source for Koob Shell. The executable product is named `KoobShell`.
 
 ## Features
 
-- a Terminal.app-style window with **in-app tabs** (multiple independent shell sessions)
-- a live shell session backed by a PTY (via [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm))
-- **10,000-line scrollback** and **Find** (⌘F / ⌘G)
-- safer **paste** with line-ending normalization and multi-line confirmation
-- themes, plugins, and an optional [ASCII art gallery](Plugins/ascii-gallery/Ascii_art/README.md) (bring your own art — personal files stay local / gitignored)
-- SQLite-backed **process time tracking** for any process or app
-- optional **Workflow Intelligence** session capture
+- a real PTY shell (via [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)) with **in-app tabs** and **split panes**
+- **10,000-line scrollback**, Find (⌘F / ⌘G), and safer paste (line-ending normalisation + multi-line confirmation)
+- **plugin-first** extensibility — themes, commands, gallery art, and workflow tools load from plugin manifests
+- bundled plugins today: [Shell Theme Pack](Plugins/shell-theme-pack/plugin.json), [ASCII Gallery](Ascii_art/README.md), [Workflow Intelligence](docs/workflow-intelligence.md)
+- SQLite-backed **process time tracking** for any process or app (`tracker`)
 
 ## Requirements
 
@@ -26,7 +53,7 @@ This repository (`mac-terminal-tracker`) is the SwiftPM source for the **Koob Sh
 ## Quick start
 
 ```bash
-git clone https://github.com/vurzumm/mac-terminal-tracker.git
+git clone https://github.com/Animus-exe/Koob-Shell.git
 cd mac-terminal-tracker
 swift run
 ```
@@ -47,9 +74,10 @@ Tests live under `Tests/` and are gitignored — they stay on your machine and a
 | [docs/configuration.md](docs/configuration.md) | App Support files, themes, preferences |
 | [docs/tracker.md](docs/tracker.md) | Track any process or app |
 | [docs/plugins.md](docs/plugins.md) | Plugin manifest format |
-| [ASCII Gallery](Plugins/ascii-gallery/Ascii_art/README.md) | Add your own gallery art |
+| [ASCII Gallery](Ascii_art/README.md) | Drop art in `Ascii_art/` |
 | [docs/workflow-intelligence.md](docs/workflow-intelligence.md) | Session capture and `koobshell` |
 | [docs/architecture.md](docs/architecture.md) | Project layout for contributors |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute (plugins, core, PRs) |
 
 Full index: [docs/README.md](docs/README.md)
 
@@ -80,7 +108,9 @@ Config and data live in `~/Library/Application Support/KoobShell/`.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and feature requests: [open an issue](https://github.com/vurzumm/mac-terminal-tracker/issues).
+Want to help? See the full guide: **[CONTRIBUTING.md](CONTRIBUTING.md)**.
+
+Short version: prefer shipping new capabilities as **plugins**, keep PRs focused, and open an [issue](https://github.com/Animus-exe/Koob-Shell/issues) for bugs or ideas.
 
 ## Security
 

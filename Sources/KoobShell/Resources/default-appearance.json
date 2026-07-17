@@ -32,7 +32,7 @@
       "id" : "ember-custom",
       "name" : "Ember Custom",
       "promptLabel" : "koob",
-      "terminalPadding" : 10
+      "terminalPadding" : 0
     }
   ],
   "galleryEnabled" : true,

@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 @main
-struct MacTerminalTrackerApp: App {
+struct KoobShellApp: App {
     @State private var viewModel: AppViewModel?
     private let preferencesWindowController: PreferencesWindowController?
     private let launchError: String?
@@ -86,6 +86,31 @@ struct MacTerminalTrackerApp: App {
                     }
                 }
                 .keyboardShortcut("w", modifiers: .command)
+
+                Divider()
+
+                Button("Split Vertically") {
+                    guard let selected = viewModel?.sessions.selectedSession else { return }
+                    let paneID = selected.focusedPaneID
+                    _ = viewModel?.splitPane(tabID: selected.id, paneID: paneID, axis: .horizontal)
+                }
+                .keyboardShortcut("d", modifiers: .command)
+
+                Button("Split Horizontally") {
+                    guard let selected = viewModel?.sessions.selectedSession else { return }
+                    let paneID = selected.focusedPaneID
+                    _ = viewModel?.splitPane(tabID: selected.id, paneID: paneID, axis: .vertical)
+                }
+                .keyboardShortcut("d", modifiers: [.command, .shift])
+
+                Button("Close Pane") {
+                    guard let selected = viewModel?.sessions.selectedSession else { return }
+                    let paneID = selected.focusedPaneID
+                    if viewModel?.closePane(tabID: selected.id, paneID: paneID) == true {
+                        NSApp.keyWindow?.close()
+                    }
+                }
+                .keyboardShortcut("w", modifiers: [.command, .shift])
             }
 
             CommandGroup(replacing: .pasteboard) {

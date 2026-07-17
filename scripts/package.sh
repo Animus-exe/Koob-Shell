@@ -2,12 +2,12 @@
 # Builds a release binary, wraps it in Koob Shell.app, and produces a DMG installer.
 #
 # Usage: scripts/package.sh [version]
-#   version defaults to 1.0.0
+#   version defaults to 0.001.0
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-VERSION="${1:-1.0.0}"
+VERSION="${1:-0.001.0}"
 APP_NAME="Koob Shell"
 EXECUTABLE="KoobShell"
 BUNDLE_ID="com.vurzumm.koobshell"
@@ -31,7 +31,7 @@ mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp "$BIN_PATH/$EXECUTABLE" "$APP_DIR/Contents/MacOS/$EXECUTABLE"
 
 # Bundle.module resolves the SwiftPM resource bundle from Contents/Resources.
-cp -R "$BIN_PATH/MacTerminalTracker_MacTerminalTracker.bundle" "$APP_DIR/Contents/Resources/"
+cp -R "$BIN_PATH/KoobShell_KoobShell.bundle" "$APP_DIR/Contents/Resources/"
 
 printf 'APPL????' > "$APP_DIR/Contents/PkgInfo"
 

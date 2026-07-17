@@ -110,7 +110,7 @@ final class ShellSession: @unchecked Sendable {
         environment["TERM"] = "xterm-256color"
         environment["COLORTERM"] = "truecolor"
         environment["TERM_PROGRAM"] = AppPaths.appName
-        environment["TERM_PROGRAM_VERSION"] = "1.0"
+        environment["TERM_PROGRAM_VERSION"] = "0.001.0"
         environment["TERM_SESSION_ID"] = UUID().uuidString
         environment["CLICOLOR"] = "1"
 

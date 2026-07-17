@@ -30,12 +30,12 @@ final class GalleryRegistry {
                 continue
             }
 
-            let artDirectory = AsciiArtGallery.resolveArtDirectory(
+            let artDirectories = AsciiArtGallery.resolveArtDirectories(
                 pluginID: plugin.manifest.id,
                 gallery: gallery,
                 installedRoot: plugin.rootURL
             )
-            let loadedEntries = AsciiArtGallery.loadEntries(from: artDirectory)
+            let loadedEntries = AsciiArtGallery.loadEntries(from: artDirectories)
             guard !loadedEntries.isEmpty else {
                 continue
             }
