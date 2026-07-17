@@ -1,5 +1,3 @@
-<div align="center">
-
 # Koob Shell
 
 [![CI](https://github.com/Animus-exe/Koob-Shell/actions/workflows/ci.yml/badge.svg)](https://github.com/Animus-exe/Koob-Shell/actions/workflows/ci.yml)
@@ -37,8 +35,6 @@
 The point of the project is not another fixed-feature terminal — it is a base you shape yourself. New capabilities ship as **plugins**, so you can mix themes, visuals, and tools and effectively **build your own terminal**: highly visually customisable, and just as customisable in what it can do.
 
 This repository is the SwiftPM source for Koob Shell. The executable product is named `KoobShell`.
-
-</div>
 
 ## Features
 
@@ -124,8 +120,4 @@ See [SECURITY.md](SECURITY.md) for how to report vulnerabilities.
 
 MIT — see [LICENSE](LICENSE). Third-party dependencies: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-<div align="center">
-
 Created by [vurzumm](https://github.com/vurzumm).
-
-</div>
