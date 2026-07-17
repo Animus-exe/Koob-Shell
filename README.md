@@ -38,6 +38,8 @@ The point of the project is not another fixed-feature terminal — it is a base 
 
 This repository is the SwiftPM source for Koob Shell. The executable product is named `KoobShell`.
 
+</div>
+
 ## Features
 
 - a real PTY shell (via [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)) with **in-app tabs** and **split panes**
@@ -121,6 +123,8 @@ See [SECURITY.md](SECURITY.md) for how to report vulnerabilities.
 ## License
 
 MIT — see [LICENSE](LICENSE). Third-party dependencies: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+<div align="center">
 
 Created by [vurzumm](https://github.com/vurzumm).
 
