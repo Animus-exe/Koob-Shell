@@ -1,0 +1,45 @@
+{
+  "activeThemeID" : "midnight",
+  "allowPluginGalleries" : true,
+  "allowPluginThemes" : true,
+  "colorOverrides" : {
+    "accentColor" : null,
+    "backgroundColor" : null,
+    "foregroundColor" : null
+  },
+  "borderOverrides" : {
+    "colorDepth" : null,
+    "opacity" : null,
+    "primaryColor" : null,
+    "secondaryColor" : null
+  },
+  "titleBarOverrides" : {
+    "colorDepth" : null,
+    "opacity" : null,
+    "primaryColor" : null,
+    "secondaryColor" : null
+  },
+  "customThemes" : [
+    {
+      "accentColor" : "#FB7185",
+      "backgroundColor" : "#1C1917",
+      "bannerAlignment" : "center",
+      "bannerEnabled" : true,
+      "bannerText" : "██╗  ██╗ ██████╗  ██████╗ ██████╗\n██║ ██╔╝██╔═══██╗██╔═══██╗██╔══██╗\n█████╔╝ ██║   ██║██║   ██║██████╔╝\n██╔═██╗ ██║   ██║██║   ██║██╔══██╗\n██║  ██╗╚██████╔╝╚██████╔╝██████╔╝\n╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚═════╝\n",
+      "fontName" : "Menlo",
+      "fontSize" : 13,
+      "foregroundColor" : "#FAFAF9",
+      "id" : "ember-custom",
+      "name" : "Ember Custom",
+      "promptLabel" : "koob",
+      "terminalPadding" : 10
+    }
+  ],
+  "galleryEnabled" : true,
+  "galleryFullScreen" : true,
+  "galleryIntervalSeconds" : 48,
+  "galleryOpacity" : 0.1,
+  "galleryRevolve" : false,
+  "galleryTintColor" : "#C8FACC",
+  "terminalOpacity" : 0.18
+}

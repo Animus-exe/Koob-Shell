@@ -1,0 +1,11 @@
+{
+  "commands": [],
+  "gallery": {
+    "artDirectory": "Ascii_art"
+  },
+  "id": "ascii-gallery",
+  "isEnabled": true,
+  "name": "ASCII Gallery",
+  "themes": [],
+  "version": "1.0.0"
+}

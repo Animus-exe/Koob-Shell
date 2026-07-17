@@ -1,0 +1,52 @@
+{
+  "commands" : [
+    {
+      "arguments" : [
+        {
+          "defaultValue" : "HEAD~1",
+          "id" : "581E0F49-61D1-4AF6-B364-C796A0B6764C",
+          "key" : "range",
+          "label" : "Revision Range",
+          "required" : false
+        }
+      ],
+      "defaultWorkingDirectory" : null,
+      "environment" : {
+      },
+      "id" : "E97158A3-6968-48BA-981D-CCEF2D1FF4C5",
+      "name" : "Git Graph",
+      "runMode" : "interactive",
+      "template" : "git log --graph --oneline --decorate {{range}}"
+    },
+    {
+      "arguments" : [],
+      "defaultWorkingDirectory" : null,
+      "environment" : {
+      },
+      "id" : "0D89CC87-F57A-4115-9099-D0D75F15EED2",
+      "name" : "Git Quick Check",
+      "runMode" : "batch",
+      "template" : "git status\nprintf '\\n'\ngit branch --show-current\ngit log --oneline -5"
+    }
+  ],
+  "id" : "git-helper-pack",
+  "isEnabled" : true,
+  "name" : "Git Helper Pack",
+  "themes" : [
+    {
+      "accentColor" : "#22C55E",
+      "backgroundColor" : "#030712",
+      "bannerAlignment" : "leading",
+      "bannerEnabled" : true,
+      "bannerText" : "  ____ ___ _____\n / ___|_ _|_   _|\n| |  _ | |  | |\n| |_| || |  | |\n \\____|___| |_|\n",
+      "fontName" : "SF Mono",
+      "fontSize" : 13,
+      "foregroundColor" : "#DCFCE7",
+      "id" : "git-ops",
+      "name" : "Git Ops",
+      "promptLabel" : "git",
+      "terminalPadding" : 14
+    }
+  ],
+  "version" : "1.0.0"
+}

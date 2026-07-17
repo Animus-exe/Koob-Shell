@@ -1,0 +1,38 @@
+.DS_Store
+/.build
+/dist
+/Packages
+xcuserdata/
+DerivedData/
+.swiftpm/configuration/registries.json
+.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+.netrc
+
+# Local Python tooling (e.g. ASCII art conversion)
+.venv/
+__pycache__/
+*.pyc
+
+# Editor / IDE
+.cursor/
+*.xcuserstate
+
+# Local runtime data (never commit user databases)
+*.sqlite3
+*.sqlite3-*
+
+# Local test suite (kept private; run with `swift test` from a full checkout)
+/Tests/
+
+# Personal ASCII gallery art — keep private; do not upload to GitHub.
+# Ignore art files under Ascii_art/, but keep instructions, templates,
+# and the bundled Koob default animation.
+**/Ascii_art/*
+!**/Ascii_art/README.md
+!**/Ascii_art/*.example
+!**/Ascii_art/00-koob.json
+!**/Ascii_art/01-koob.json
+!**/Ascii_art/02-koob.json
+!**/Ascii_art/03-koob.json
+*.ascii
+*.asc

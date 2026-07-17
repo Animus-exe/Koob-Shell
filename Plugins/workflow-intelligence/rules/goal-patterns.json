@@ -1,0 +1,31 @@
+{
+  "goals": [
+    {
+      "id": "fix-build",
+      "label": "fix build issue",
+      "requiresFailures": true,
+      "signals": ["npm run build", "cargo build", "swift build", "make"]
+    },
+    {
+      "id": "container-setup",
+      "label": "container setup",
+      "signals": ["docker compose", "docker-compose", "kubectl apply"]
+    },
+    {
+      "id": "investigate-changes",
+      "label": "investigate changes",
+      "signals": ["git status", "git diff"]
+    },
+    {
+      "id": "fix-tests",
+      "label": "fix test failure",
+      "requiresFailures": true,
+      "signals": ["npm test", "pytest", "swift test", "cargo test"]
+    },
+    {
+      "id": "dependency-update",
+      "label": "update dependencies",
+      "signals": ["npm install", "bundle install", "pip install"]
+    }
+  ]
+}

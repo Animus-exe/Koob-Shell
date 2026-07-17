@@ -1,0 +1,20 @@
+{
+  "templates": [
+    {
+      "changeKind": "modified",
+      "template": "git checkout -- {{paths}}"
+    },
+    {
+      "changeKind": "added",
+      "template": "git clean -f -- {{paths}}"
+    },
+    {
+      "afterCommand": "npm install",
+      "template": "git checkout -- package.json package-lock.json"
+    },
+    {
+      "afterCommand": "git reset --hard",
+      "template": "git reflog -5"
+    }
+  ]
+}

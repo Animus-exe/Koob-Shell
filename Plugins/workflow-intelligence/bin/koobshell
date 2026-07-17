@@ -1,0 +1,776 @@
+#!/bin/bash
+# Koob Shell Workflow Intelligence CLI
+# Installed by the workflow-intelligence plugin when enabled.
+
+set -eu
+
+APP_NAME="KoobShell"
+DB="$HOME/Library/Application Support/$APP_NAME/tracker.sqlite3"
+STATE_DIR="$HOME/Library/Application Support/$APP_NAME/workflow-state"
+CURRENT_CMD_FILE="$STATE_DIR/current-command.json"
+CURRENT_SESSION_FILE="$STATE_DIR/current-session.txt"
+
+print_help() {
+  cat <<'EOF'
+koobshell - Workflow Intelligence CLI
+
+  koobshell explain [last|session-id]     Session summary report
+  koobshell undo [last-risky] [--apply]   Rollback plan for risky changes
+  koobshell replay [last|session-id]      Print command replay script
+  koobshell show-why-failed [last]        Diagnose last failed command
+  koobshell debug-report [--format md|json|text]
+  koobshell session list                  List recent workflow sessions
+  koobshell session search <query>        Search sessions and commands
+  koobshell help                          Show this help
+EOF
+}
+
+case "${1:-help}" in
+  help|--help|-h)
+    print_help
+    exit 0
+    ;;
+esac
+
+mkdir -p "$STATE_DIR"
+
+if ! command -v sqlite3 >/dev/null 2>&1; then
+  echo "sqlite3 is required for koobshell."
+  exit 1
+fi
+
+if [ ! -f "$DB" ]; then
+  echo "Workflow database not found yet. Launch Koob Shell first."
+  exit 1
+fi
+
+sql_escape() {
+  printf "%s" "$1" | sed "s/'/''/g"
+}
+
+now_ts() {
+  date +%s
+}
+
+shell_escape() {
+  printf "%q" "$1"
+}
+
+render_shell_command() {
+  local prefix="$1"
+  shift
+
+  local rendered="$prefix"
+  local path
+  for path in "$@"; do
+    rendered="$rendered $(shell_escape "$path")"
+  done
+
+  printf "%s" "$rendered"
+}
+
+resolve_project_root() {
+  cwd="$1"
+  if git -C "$cwd" rev-parse --show-toplevel >/dev/null 2>&1; then
+    git -C "$cwd" rev-parse --show-toplevel
+  else
+    printf "%s" "$cwd"
+  fi
+}
+
+project_name_from_root() {
+  basename "$1"
+}
+
+classify_risk() {
+  cmd="$1"
+  plugin_id="${2:-workflow-intelligence}"
+  rules_dir="$HOME/Library/Application Support/$APP_NAME/plugins/$plugin_id/rules"
+  destructive_file="$rules_dir/destructive-commands.json"
+
+  risk="low"
+  warning=""
+
+  if [ -f "$destructive_file" ] && command -v python3 >/dev/null 2>&1; then
+    result="$(python3 - "$destructive_file" "$cmd" <<'PY'
+import json, re, sys
+path, cmd = sys.argv[1], sys.argv[2]
+with open(path) as f:
+    data = json.load(f)
+best = ("low", "")
+order = {"safe": 0, "low": 1, "medium": 2, "high": 3, "destructive": 4}
+best_rank = -1
+for item in data.get("patterns", []):
+    pattern = item.get("regex", "")
+    try:
+        if re.search(pattern, cmd):
+            risk = item.get("risk", "low")
+            rank = order.get(risk, 1)
+            if rank > best_rank:
+                best_rank = rank
+                best = (risk, item.get("warning", "") or "")
+    except re.error:
+        continue
+print(best[0])
+print(best[1])
+PY
+)"
+    risk="$(printf "%s" "$result" | sed -n '1p')"
+    warning="$(printf "%s" "$result" | sed -n '2p')"
+  fi
+
+  printf "%s\n%s" "$risk" "$warning"
+}
+
+record_git_changes() {
+  session_id="$1"
+  command_id="$2"
+  cwd="$3"
+  plugin_id="$4"
+
+  if ! git -C "$cwd" rev-parse --git-dir >/dev/null 2>&1; then
+    return 0
+  fi
+
+  git -C "$cwd" status --porcelain 2>/dev/null | while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    kind="$(printf "%.1s" "$line")"
+    path="$(printf "%s" "$line" | sed 's/^...//')"
+    change_kind="modified"
+    case "$kind" in
+      A|??) change_kind="added" ;;
+      D) change_kind="deleted" ;;
+      M) change_kind="modified" ;;
+      R) change_kind="renamed" ;;
+    esac
+    change_id="$(uuidgen 2>/dev/null || python3 -c 'import uuid; print(uuid.uuid4())')"
+    detected_at="$(now_ts)"
+    sqlite3 "$DB" "
+      INSERT OR IGNORE INTO workflow_file_changes
+      (id, session_id, command_id, path, change_kind, detected_at)
+      VALUES (
+        '$(sql_escape "$change_id")',
+        '$(sql_escape "$session_id")',
+        '$(sql_escape "$command_id")',
+        '$(sql_escape "$path")',
+        '$(sql_escape "$change_kind")',
+        $detected_at
+      );
+    " 2>/dev/null || true
+  done
+}
+
+generate_rollback_plan() {
+  session_id="$1"
+  plugin_id="$2"
+  rules_dir="$HOME/Library/Application Support/$APP_NAME/plugins/$plugin_id/rules"
+  rollback_file="$rules_dir/rollback-templates.json"
+
+  paths="$(sqlite3 -separator '|' "$DB" "
+    SELECT path, change_kind FROM workflow_file_changes
+    WHERE session_id = '$(sql_escape "$session_id")'
+    ORDER BY detected_at;
+  " 2>/dev/null || true)"
+
+  plan=""
+  if [ -n "$paths" ]; then
+    local -a modified_paths=()
+    local -a added_paths=()
+    while IFS='|' read -r path change_kind; do
+      case "$change_kind" in
+        modified) modified_paths+=("$path") ;;
+        added) added_paths+=("$path") ;;
+      esac
+    done <<< "$paths"
+
+    if [ "${#modified_paths[@]}" -gt 0 ]; then
+      plan="${plan}$(render_shell_command "git checkout --" "${modified_paths[@]}")\n"
+    fi
+    if [ "${#added_paths[@]}" -gt 0 ]; then
+      plan="${plan}$(render_shell_command "git clean -f --" "${added_paths[@]}")\n"
+    fi
+  fi
+
+  last_cmd="$(sqlite3 "$DB" "
+    SELECT command_text FROM workflow_commands
+    WHERE session_id = '$(sql_escape "$session_id")'
+    ORDER BY seq DESC LIMIT 1;
+  " 2>/dev/null || true)"
+
+  if [ -f "$rollback_file" ] && [ -n "$last_cmd" ] && command -v python3 >/dev/null 2>&1; then
+    extra="$(python3 - "$rollback_file" "$last_cmd" <<'PY'
+import json, sys
+path, cmd = sys.argv[1], sys.argv[2]
+with open(path) as f:
+    data = json.load(f)
+for item in data.get("templates", []):
+    after = item.get("afterCommand")
+    if after and after in cmd:
+        print(item.get("template", ""))
+        break
+PY
+)"
+    if [ -n "$extra" ]; then
+      plan="${plan}${extra}\n"
+    fi
+  fi
+
+  if [ -z "$plan" ]; then
+    plan="No automatic rollback available for this session."
+  fi
+
+  generated_at="$(now_ts)"
+  plan_id="$(uuidgen 2>/dev/null || python3 -c 'import uuid; print(uuid.uuid4())')"
+  sqlite3 "$DB" "
+    INSERT INTO workflow_rollback_plans (id, session_id, plan_json, generated_at)
+    VALUES (
+      '$(sql_escape "$plan_id")',
+      '$(sql_escape "$session_id")',
+      '$(sql_escape "$plan")',
+      $generated_at
+    );
+  " 2>/dev/null || true
+
+  printf "%b" "$plan"
+}
+
+detect_goal() {
+  session_id="$1"
+  plugin_id="$2"
+  rules_dir="$HOME/Library/Application Support/$APP_NAME/plugins/$plugin_id/rules"
+  goal_file="$rules_dir/goal-patterns.json"
+
+  commands="$(sqlite3 "$DB" "
+    SELECT command_text || '|' || COALESCE(exit_code, 0)
+    FROM workflow_commands
+    WHERE session_id = '$(sql_escape "$session_id")'
+    ORDER BY seq;
+  " 2>/dev/null || true)"
+
+  if [ ! -f "$goal_file" ] || [ -z "$commands" ] || ! command -v python3 >/dev/null 2>&1; then
+    return 0
+  fi
+
+  goal="$(python3 - "$goal_file" <<'PY'
+import json, sys
+path = sys.argv[1]
+commands = sys.stdin.read().strip().splitlines()
+cmd_texts = [line.rsplit("|", 1)[0] for line in commands if line]
+exit_codes = [int(line.rsplit("|", 1)[1]) for line in commands if "|" in line]
+has_failure = any(code != 0 for code in exit_codes)
+with open(path) as f:
+    data = json.load(f)
+best = None
+best_score = 0
+for goal in data.get("goals", []):
+    score = 0
+    for signal in goal.get("signals", []):
+        if any(signal in cmd for cmd in cmd_texts):
+            score += 1
+    if goal.get("requiresFailures") and not has_failure:
+        continue
+    if score > best_score:
+        best_score = score
+        best = goal.get("label")
+print(best or "")
+PY
+)" <<< "$commands"
+
+  if [ -n "$goal" ]; then
+    sqlite3 "$DB" "
+      UPDATE workflow_sessions
+      SET detected_goal = '$(sql_escape "$goal")'
+      WHERE id = '$(sql_escape "$session_id")';
+    " 2>/dev/null || true
+  fi
+}
+
+update_session_outcome() {
+  session_id="$1"
+  failures="$(sqlite3 "$DB" "
+    SELECT COUNT(*) FROM workflow_commands
+    WHERE session_id = '$(sql_escape "$session_id")' AND exit_code != 0;
+  " 2>/dev/null || echo 0)"
+  successes="$(sqlite3 "$DB" "
+    SELECT COUNT(*) FROM workflow_commands
+    WHERE session_id = '$(sql_escape "$session_id")' AND exit_code = 0;
+  " 2>/dev/null || echo 0)"
+
+  outcome="mixed"
+  if [ "$failures" = "0" ] && [ "$successes" != "0" ]; then
+    outcome="success"
+  elif [ "$successes" = "0" ] && [ "$failures" != "0" ]; then
+    outcome="failure"
+  elif [ "$failures" = "0" ] && [ "$successes" = "0" ]; then
+    outcome="inProgress"
+  fi
+
+  sqlite3 "$DB" "
+    UPDATE workflow_sessions SET outcome = '$(sql_escape "$outcome")'
+    WHERE id = '$(sql_escape "$session_id")';
+  " 2>/dev/null || true
+}
+
+cmd_session_open() {
+  plugin_id="${KOOBSHELL_PLUGIN_ID:-workflow-intelligence}"
+  session_id="${KOOBSHELL_SESSION_ID:-}"
+  cwd="${PWD:-$HOME}"
+
+  if [ -z "$session_id" ]; then
+    echo "session-open requires KOOBSHELL_SESSION_ID" >&2
+    exit 1
+  fi
+
+  project_root="$(resolve_project_root "$cwd")"
+  project_name="$(project_name_from_root "$project_root")"
+  started_at="$(now_ts)"
+
+  sqlite3 "$DB" "
+    INSERT OR IGNORE INTO workflow_sessions
+    (id, plugin_id, project_root, project_name, detected_goal, outcome, started_at, ended_at, summary_text)
+    VALUES (
+      '$(sql_escape "$session_id")',
+      '$(sql_escape "$plugin_id")',
+      '$(sql_escape "$project_root")',
+      '$(sql_escape "$project_name")',
+      NULL,
+      'inProgress',
+      $started_at,
+      NULL,
+      NULL
+    );
+  "
+
+  printf "%s" "$session_id" > "$CURRENT_SESSION_FILE"
+}
+
+cmd_session_close() {
+  session_id=""
+  if [ -f "$CURRENT_SESSION_FILE" ]; then
+    session_id="$(cat "$CURRENT_SESSION_FILE")"
+  fi
+  session_id="${1:-$session_id}"
+
+  if [ -z "$session_id" ]; then
+    return 0
+  fi
+
+  ended_at="$(now_ts)"
+  detect_goal "$session_id" "${KOOBSHELL_PLUGIN_ID:-workflow-intelligence}"
+  update_session_outcome "$session_id"
+  generate_rollback_plan "$session_id" "${KOOBSHELL_PLUGIN_ID:-workflow-intelligence}" >/dev/null
+
+  sqlite3 "$DB" "
+    UPDATE workflow_sessions SET ended_at = $ended_at
+    WHERE id = '$(sql_escape "$session_id")';
+  " 2>/dev/null || true
+
+  rm -f "$CURRENT_CMD_FILE" "$CURRENT_SESSION_FILE"
+}
+
+cmd_record_start() {
+  plugin_id="workflow-intelligence"
+  session_id=""
+  cmd=""
+  cwd="$PWD"
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --plugin) plugin_id="$2"; shift 2 ;;
+      --session) session_id="$2"; shift 2 ;;
+      --cmd) cmd="$2"; shift 2 ;;
+      --cwd) cwd="$2"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+
+  [ -n "$session_id" ] || session_id="${KOOBSHELL_SESSION_ID:-}"
+  [ -n "$session_id" ] || exit 0
+  [ -n "$cmd" ] || exit 0
+
+  if ! sqlite3 "$DB" "SELECT 1 FROM workflow_sessions WHERE id = '$(sql_escape "$session_id")';" | grep -q 1; then
+    KOOBSHELL_SESSION_ID="$session_id" KOOBSHELL_PLUGIN_ID="$plugin_id" cmd_session_open
+  fi
+
+  risk_result="$(classify_risk "$cmd" "$plugin_id")"
+  risk="$(printf "%s" "$risk_result" | sed -n '1p')"
+  warning="$(printf "%s" "$risk_result" | sed -n '2p')"
+
+  if [ -n "$warning" ] && [ "${KOOBSHELL_DESTRUCTIVE_WARNINGS:-warn}" != "off" ]; then
+    printf "\033[1;33m[koobshell] Warning (%s): %s\033[0m\n" "$risk" "$warning" >&2
+  fi
+
+  seq="$(sqlite3 "$DB" "
+    SELECT COALESCE(MAX(seq), 0) + 1 FROM workflow_commands
+    WHERE session_id = '$(sql_escape "$session_id")';
+  ")"
+
+  command_id="$(uuidgen 2>/dev/null || python3 -c 'import uuid; print(uuid.uuid4())')"
+  started_at="$(now_ts)"
+
+  sqlite3 "$DB" "
+    INSERT INTO workflow_commands
+    (id, session_id, seq, command_text, cwd, exit_code, risk_level, started_at, ended_at, duration_ms)
+    VALUES (
+      '$(sql_escape "$command_id")',
+      '$(sql_escape "$session_id")',
+      $seq,
+      '$(sql_escape "$cmd")',
+      '$(sql_escape "$cwd")',
+      NULL,
+      '$(sql_escape "$risk")',
+      $started_at,
+      NULL,
+      NULL
+    );
+  "
+
+  printf '{"command_id":"%s","session_id":"%s","seq":%s}\n' "$command_id" "$session_id" "$seq" > "$CURRENT_CMD_FILE"
+}
+
+cmd_record_end() {
+  exit_code=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --exit) exit_code="$2"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+
+  [ -f "$CURRENT_CMD_FILE" ] || exit 0
+
+  command_id="$(python3 - "$CURRENT_CMD_FILE" <<'PY' 2>/dev/null || cat "$CURRENT_CMD_FILE" | sed -n 's/.*"command_id":"\([^"]*\)".*/\1/p'
+import json, sys
+with open(sys.argv[1]) as f:
+    print(json.load(f)["command_id"])
+PY
+)"
+  session_id="$(python3 - "$CURRENT_CMD_FILE" <<'PY' 2>/dev/null || cat "$CURRENT_CMD_FILE" | sed -n 's/.*"session_id":"\([^"]*\)".*/\1/p'
+import json, sys
+with open(sys.argv[1]) as f:
+    print(json.load(f)["session_id"])
+PY
+)"
+  cwd="$(sqlite3 "$DB" "SELECT cwd FROM workflow_commands WHERE id = '$(sql_escape "$command_id")';" 2>/dev/null || echo "$PWD")"
+
+  ended_at="$(now_ts)"
+  started_at="$(sqlite3 "$DB" "SELECT started_at FROM workflow_commands WHERE id = '$(sql_escape "$command_id")';" 2>/dev/null || echo "$ended_at")"
+  duration_ms=$(( (ended_at - started_at) * 1000 ))
+
+  sqlite3 "$DB" "
+    UPDATE workflow_commands
+    SET exit_code = $exit_code, ended_at = $ended_at, duration_ms = $duration_ms
+    WHERE id = '$(sql_escape "$command_id")';
+  "
+
+  record_git_changes "$session_id" "$command_id" "$cwd" "${KOOBSHELL_PLUGIN_ID:-workflow-intelligence}"
+  detect_goal "$session_id" "${KOOBSHELL_PLUGIN_ID:-workflow-intelligence}"
+  update_session_outcome "$session_id"
+
+  rm -f "$CURRENT_CMD_FILE"
+}
+
+resolve_session_id() {
+  target="${1:-last}"
+  plugin_id="${KOOBSHELL_PLUGIN_ID:-workflow-intelligence}"
+
+  case "$target" in
+    last)
+      sqlite3 "$DB" "
+        SELECT id FROM workflow_sessions
+        WHERE plugin_id = '$(sql_escape "$plugin_id")'
+        ORDER BY started_at DESC LIMIT 1;
+      "
+      ;;
+    *)
+      sqlite3 "$DB" "
+        SELECT id FROM workflow_sessions
+        WHERE plugin_id = '$(sql_escape "$plugin_id")' AND id = '$(sql_escape "$target")'
+        LIMIT 1;
+      " 2>/dev/null || sqlite3 "$DB" "
+        SELECT id FROM workflow_sessions
+        WHERE plugin_id = '$(sql_escape "$plugin_id")'
+        ORDER BY started_at DESC LIMIT 1;
+      "
+      ;;
+  esac
+}
+
+cmd_explain() {
+  target="${1:-last}"
+  session_id="$(resolve_session_id "$target")"
+  [ -n "$session_id" ] || { echo "No workflow sessions recorded yet."; exit 0; }
+
+  project_name="$(sqlite3 "$DB" "SELECT COALESCE(project_name, 'unknown') FROM workflow_sessions WHERE id = '$(sql_escape "$session_id")';")"
+  project_root="$(sqlite3 "$DB" "SELECT COALESCE(project_root, '') FROM workflow_sessions WHERE id = '$(sql_escape "$session_id")';")"
+  goal="$(sqlite3 "$DB" "SELECT COALESCE(detected_goal, 'not detected') FROM workflow_sessions WHERE id = '$(sql_escape "$session_id")';")"
+  outcome="$(sqlite3 "$DB" "SELECT outcome FROM workflow_sessions WHERE id = '$(sql_escape "$session_id")';")"
+
+  echo "Project: $project_name"
+  if [ -n "$project_root" ]; then
+    echo "Root: $project_root"
+  fi
+  echo "Goal detected: $goal"
+  echo "Outcome: $outcome"
+  echo "Commands run:"
+
+  sqlite3 -separator '|' "$DB" "
+    SELECT seq, command_text, COALESCE(exit_code, -1), risk_level
+    FROM workflow_commands
+    WHERE session_id = '$(sql_escape "$session_id")'
+    ORDER BY seq;
+  " | while IFS='|' read -r seq cmd exit_code risk; do
+    if [ "$exit_code" = "-1" ]; then
+      status="running"
+    elif [ "$exit_code" = "0" ]; then
+      status="ok"
+    else
+      status="exit $exit_code"
+    fi
+    printf "  %s. [%s/%s] %s\n" "$seq" "$risk" "$status" "$cmd"
+  done
+
+  echo "Files changed:"
+  files="$(sqlite3 "$DB" "
+    SELECT DISTINCT path FROM workflow_file_changes
+    WHERE session_id = '$(sql_escape "$session_id")'
+    ORDER BY path;
+  ")"
+  if [ -z "$files" ]; then
+    echo "  (none detected)"
+  else
+    printf "%s\n" "$files" | sed 's/^/  - /'
+  fi
+
+  echo "Safe rollback:"
+  plan="$(sqlite3 "$DB" "
+    SELECT plan_json FROM workflow_rollback_plans
+    WHERE session_id = '$(sql_escape "$session_id")'
+    ORDER BY generated_at DESC LIMIT 1;
+  " 2>/dev/null || true)"
+  if [ -z "$plan" ]; then
+    plan="$(generate_rollback_plan "$session_id" "${KOOBSHELL_PLUGIN_ID:-workflow-intelligence}")"
+  fi
+  printf "%b" "$plan" | sed 's/^/  /'
+}
+
+cmd_undo() {
+  target="last-risky"
+  apply=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --apply)
+        apply=1
+        shift
+        ;;
+      *)
+        target="$1"
+        shift
+        ;;
+    esac
+  done
+
+  plugin_id="${KOOBSHELL_PLUGIN_ID:-workflow-intelligence}"
+
+  if [ "$target" = "last-risky" ]; then
+    session_id="$(sqlite3 "$DB" "
+      SELECT wc.session_id FROM workflow_commands wc
+      JOIN workflow_sessions ws ON ws.id = wc.session_id
+      WHERE ws.plugin_id = '$(sql_escape "$plugin_id")'
+        AND wc.risk_level IN ('high', 'destructive')
+      ORDER BY wc.started_at DESC LIMIT 1;
+    ")"
+  else
+    session_id="$(resolve_session_id "$target")"
+  fi
+
+  [ -n "$session_id" ] || { echo "No risky commands found to undo."; exit 0; }
+
+  plan="$(sqlite3 "$DB" "
+    SELECT plan_json FROM workflow_rollback_plans
+    WHERE session_id = '$(sql_escape "$session_id")'
+    ORDER BY generated_at DESC LIMIT 1;
+  " 2>/dev/null || true)"
+
+  if [ -z "$plan" ]; then
+    plan="$(generate_rollback_plan "$session_id" "$plugin_id")"
+  fi
+
+  echo "Rollback plan:"
+  printf "%b\n" "$plan"
+
+  if [ "$apply" = "1" ]; then
+    echo
+    echo "Applying rollback plan..."
+    printf "%b" "$plan" | while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      echo "> $line"
+      sh -c "$line"
+    done
+  else
+    echo
+    echo "Dry run only. Pass --apply to execute."
+  fi
+}
+
+cmd_replay() {
+  target="${1:-last}"
+  session_id="$(resolve_session_id "$target")"
+  [ -n "$session_id" ] || { echo "No session to replay."; exit 0; }
+
+  echo "# Replay workflow for session $session_id"
+  sqlite3 "$DB" "
+    SELECT command_text FROM workflow_commands
+    WHERE session_id = '$(sql_escape "$session_id")'
+    ORDER BY seq;
+  " | while IFS= read -r cmd; do
+    echo "$cmd"
+  done
+}
+
+cmd_show_why_failed() {
+  target="${1:-last}"
+  plugin_id="${KOOBSHELL_PLUGIN_ID:-workflow-intelligence}"
+  session_id="$(resolve_session_id "$target")"
+  [ -n "$session_id" ] || { echo "No sessions recorded."; exit 0; }
+
+  failed="$(sqlite3 -separator '|' "$DB" "
+    SELECT seq, command_text, exit_code, cwd
+    FROM workflow_commands
+    WHERE session_id = '$(sql_escape "$session_id")' AND exit_code != 0
+    ORDER BY seq DESC LIMIT 1;
+  ")"
+
+  if [ -z "$failed" ]; then
+    echo "No failed commands in this session."
+    exit 0
+  fi
+
+  seq="$(printf "%s" "$failed" | cut -d'|' -f1)"
+  cmd="$(printf "%s" "$failed" | cut -d'|' -f2)"
+  exit_code="$(printf "%s" "$failed" | cut -d'|' -f3)"
+  cwd="$(printf "%s" "$failed" | cut -d'|' -f4)"
+
+  echo "Failed command #$seq (exit $exit_code)"
+  echo "Directory: $cwd"
+  echo "Command: $cmd"
+  echo
+  echo "Context:"
+  sqlite3 "$DB" "
+    SELECT seq, command_text, exit_code
+    FROM workflow_commands
+    WHERE session_id = '$(sql_escape "$session_id")' AND seq <= $seq
+    ORDER BY seq;
+  " | while IFS='|' read -r s c e; do
+    marker=" "
+    if [ "$s" = "$seq" ]; then marker=">"; fi
+    printf "%s %s. [%s] %s\n" "$marker" "$s" "$e" "$c"
+  done
+}
+
+cmd_debug_report() {
+  format="text"
+  target="last"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --format) format="$2"; shift 2 ;;
+      last|*) target="$1"; shift ;;
+    esac
+  done
+
+  session_id="$(resolve_session_id "$target")"
+  [ -n "$session_id" ] || { echo "No session for debug report."; exit 0; }
+
+  if [ "$format" = "json" ]; then
+    sqlite3 -json "$DB" "
+      SELECT ws.*,
+        (SELECT json_group_array(json_object(
+          'seq', wc.seq,
+          'command', wc.command_text,
+          'exit_code', wc.exit_code,
+          'risk', wc.risk_level,
+          'cwd', wc.cwd
+        )) FROM workflow_commands wc WHERE wc.session_id = ws.id) AS commands
+      FROM workflow_sessions ws
+      WHERE ws.id = '$(sql_escape "$session_id")';
+    " 2>/dev/null || cmd_explain "$target"
+  elif [ "$format" = "md" ]; then
+    echo "# Workflow Debug Report"
+    echo
+    cmd_explain "$target" | sed 's/^Project:/## Project/; s/^Goal detected:/## Goal/; s/^Outcome:/## Outcome/; s/^Commands run:/## Commands/; s/^Files changed:/## Files Changed/; s/^Safe rollback:/## Safe Rollback/'
+  else
+    cmd_explain "$target"
+  fi
+}
+
+cmd_session_list() {
+  plugin_id="${KOOBSHELL_PLUGIN_ID:-workflow-intelligence}"
+  sqlite3 -separator '|' "$DB" "
+    SELECT id, COALESCE(project_name, ''), COALESCE(detected_goal, ''), outcome, started_at
+    FROM workflow_sessions
+    WHERE plugin_id = '$(sql_escape "$plugin_id")'
+    ORDER BY started_at DESC LIMIT 20;
+  " | while IFS='|' read -r id project goal outcome started; do
+    date_str="$(date -r "$started" '+%Y-%m-%d %H:%M' 2>/dev/null || date -d "@$started" '+%Y-%m-%d %H:%M' 2>/dev/null || echo "$started")"
+    printf "%s  %-16s  %-20s  %s  %s\n" "$id" "$project" "$goal" "$outcome" "$date_str"
+  done
+}
+
+cmd_session_search() {
+  query="${1:-}"
+  plugin_id="${KOOBSHELL_PLUGIN_ID:-workflow-intelligence}"
+  [ -n "$query" ] || { echo "Usage: koobshell session search <query>"; exit 1; }
+
+  sqlite3 -separator '|' "$DB" "
+    SELECT DISTINCT ws.id, COALESCE(ws.project_name, ''), COALESCE(ws.detected_goal, ''), ws.outcome
+    FROM workflow_sessions ws
+    LEFT JOIN workflow_commands wc ON wc.session_id = ws.id
+    WHERE ws.plugin_id = '$(sql_escape "$plugin_id")'
+      AND (
+        ws.project_name LIKE '%$(sql_escape "$query")%'
+        OR ws.detected_goal LIKE '%$(sql_escape "$query")%'
+        OR wc.command_text LIKE '%$(sql_escape "$query")%'
+      )
+    ORDER BY ws.started_at DESC LIMIT 20;
+  " | while IFS='|' read -r id project goal outcome; do
+    printf "%s  %s  %s  %s\n" "$id" "$project" "$goal" "$outcome"
+  done
+}
+
+cmd_help() {
+  print_help
+}
+
+main() {
+  cmd="${1:-help}"
+  shift || true
+
+  case "$cmd" in
+    record-start) cmd_record_start "$@" ;;
+    record-end) cmd_record_end "$@" ;;
+    session-open) cmd_session_open "$@" ;;
+    session-close) cmd_session_close "$@" ;;
+    explain) cmd_explain "$@" ;;
+    undo) cmd_undo "$@" ;;
+    replay) cmd_replay "$@" ;;
+    show-why-failed) cmd_show_why_failed "$@" ;;
+    debug-report) cmd_debug_report "$@" ;;
+    session)
+      sub="${1:-list}"
+      shift || true
+      case "$sub" in
+        list) cmd_session_list "$@" ;;
+        search) cmd_session_search "$@" ;;
+        *) cmd_help; exit 1 ;;
+      esac
+      ;;
+    help|--help|-h) cmd_help ;;
+    *)
+      echo "Unknown koobshell command: $cmd" >&2
+      cmd_help
+      exit 1
+      ;;
+  esac
+}
+
+main "$@"

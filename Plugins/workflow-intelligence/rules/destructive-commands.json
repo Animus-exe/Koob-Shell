@@ -1,0 +1,56 @@
+{
+  "patterns": [
+    {
+      "regex": "git reset --hard",
+      "risk": "destructive",
+      "warning": "This will discard uncommitted changes."
+    },
+    {
+      "regex": "git clean -f",
+      "risk": "destructive",
+      "warning": "This will remove untracked files."
+    },
+    {
+      "regex": "git push --force",
+      "risk": "destructive",
+      "warning": "This will overwrite remote history."
+    },
+    {
+      "regex": "rm -rf",
+      "risk": "destructive",
+      "warning": "This will permanently delete files."
+    },
+    {
+      "regex": "docker system prune",
+      "risk": "destructive"
+    },
+    {
+      "regex": "DROP TABLE",
+      "risk": "destructive"
+    },
+    {
+      "regex": "npm install",
+      "risk": "medium"
+    },
+    {
+      "regex": "git checkout",
+      "risk": "medium"
+    },
+    {
+      "regex": "sed -i",
+      "risk": "medium"
+    },
+    {
+      "regex": "git status",
+      "risk": "safe"
+    },
+    {
+      "regex": "^ls",
+      "risk": "safe"
+    },
+    {
+      "regex": "^cat ",
+      "risk": "safe"
+    }
+  ]
+}

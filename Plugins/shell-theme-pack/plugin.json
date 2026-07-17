@@ -1,0 +1,75 @@
+{
+  "commands": [],
+  "id": "shell-theme-pack",
+  "isEnabled": true,
+  "name": "Shell Theme Pack",
+  "themes": [
+    {
+      "accentColor": "#22D3EE",
+      "backgroundColor": "#0B1020",
+      "bannerAlignment": "center",
+      "bannerEnabled": false,
+      "bannerText": "",
+      "border": {
+        "colorDepth": 0.85,
+        "opacity": 0.6,
+        "primaryColor": "#22D3EE",
+        "secondaryColor": "#A855F7"
+      },
+      "titleBar": {
+        "colorDepth": 1.0,
+        "opacity": 0.95,
+        "primaryColor": "#0EA5E9",
+        "secondaryColor": "#6D28D9"
+      },
+      "fontName": "Menlo",
+      "fontSize": 13,
+      "foregroundColor": "#E0F2FE",
+      "id": "aurora-shell",
+      "name": "Aurora Shell",
+      "promptLabel": "shell",
+      "terminalPadding": 12
+    },
+    {
+      "accentColor": "#FB7185",
+      "backgroundColor": "#1C1917",
+      "bannerAlignment": "center",
+      "bannerEnabled": false,
+      "bannerText": "",
+      "border": {
+        "colorDepth": 0.45,
+        "opacity": 0.5,
+        "primaryColor": "#FB7185",
+        "secondaryColor": "#F59E0B"
+      },
+      "fontName": "Menlo",
+      "fontSize": 13,
+      "foregroundColor": "#FAFAF9",
+      "id": "ember-rim",
+      "name": "Ember Rim",
+      "promptLabel": "shell",
+      "terminalPadding": 12
+    },
+    {
+      "accentColor": "#94A3B8",
+      "backgroundColor": "#111827",
+      "bannerAlignment": "center",
+      "bannerEnabled": false,
+      "bannerText": "",
+      "border": {
+        "colorDepth": 0.5,
+        "opacity": 0.25,
+        "primaryColor": "#94A3B8",
+        "secondaryColor": null
+      },
+      "fontName": "Menlo",
+      "fontSize": 13,
+      "foregroundColor": "#E2E8F0",
+      "id": "frost-glass",
+      "name": "Frost Glass",
+      "promptLabel": "shell",
+      "terminalPadding": 10
+    }
+  ],
+  "version": "1.0.0"
+}

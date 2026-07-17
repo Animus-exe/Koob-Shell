@@ -1,0 +1,64 @@
+{
+  "commands": [
+    {
+      "arguments": [],
+      "defaultWorkingDirectory": null,
+      "environment": {},
+      "id": "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
+      "name": "Explain Last Session",
+      "runMode": "interactive",
+      "template": "koobshell explain last"
+    },
+    {
+      "arguments": [],
+      "defaultWorkingDirectory": null,
+      "environment": {},
+      "id": "B2C3D4E5-F6A7-8901-BCDE-F12345678901",
+      "name": "Undo Last Risky Change",
+      "runMode": "interactive",
+      "template": "koobshell undo last-risky"
+    },
+    {
+      "arguments": [],
+      "defaultWorkingDirectory": null,
+      "environment": {},
+      "id": "C3D4E5F6-A7B8-9012-CDEF-123456789012",
+      "name": "Show Why Build Failed",
+      "runMode": "interactive",
+      "template": "koobshell show-why-failed last"
+    },
+    {
+      "arguments": [],
+      "defaultWorkingDirectory": null,
+      "environment": {},
+      "id": "D4E5F6A7-B8C9-0123-DEF0-234567890123",
+      "name": "Package Debug Report",
+      "runMode": "interactive",
+      "template": "koobshell debug-report --format md"
+    }
+  ],
+  "id": "workflow-intelligence",
+  "isEnabled": true,
+  "name": "Workflow Intelligence",
+  "themes": [],
+  "version": "1.0.0",
+  "workflow": {
+    "cliName": "koobshell",
+    "rulesDirectory": "rules",
+    "shellIntegration": {
+      "bashHook": "shell/koobshell.bash",
+      "envFlag": "KOOBSHELL_INTEGRATION",
+      "sessionEnvVar": "KOOBSHELL_SESSION_ID",
+      "zshHook": "shell/koobshell.zsh"
+    },
+    "preferences": {
+      "autoSummaryOnExit": true,
+      "captureEnabled": true,
+      "destructiveWarnings": "warn"
+    },
+    "ui": {
+      "defaultPanelWidth": 320,
+      "inspectorPanelEnabled": true
+    }
+  }
+}

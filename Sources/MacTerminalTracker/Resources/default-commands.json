@@ -1,0 +1,49 @@
+[
+  {
+    "arguments" : [
+      {
+        "defaultValue" : ".",
+        "id" : "B5F414AC-EFE3-4CB3-B5D7-D3A17EE2C8C0",
+        "key" : "path",
+        "label" : "Path",
+        "required" : false
+      }
+    ],
+    "defaultWorkingDirectory" : null,
+    "environment" : {
+    },
+    "id" : "C1B44B4B-5F57-4478-BFD8-5D1139567ED4",
+    "name" : "List Files",
+    "runMode" : "interactive",
+    "template" : "ls -la {{path}}"
+  },
+  {
+    "arguments" : [
+      {
+        "defaultValue" : "main",
+        "id" : "9AA458C2-49BE-430C-BD7A-120A88EC24A9",
+        "key" : "branch",
+        "label" : "Branch",
+        "required" : false
+      }
+    ],
+    "defaultWorkingDirectory" : null,
+    "environment" : {
+    },
+    "id" : "E6F18177-70BC-4D18-A9D4-AB8A0B7F7F01",
+    "name" : "Git Status",
+    "runMode" : "interactive",
+    "template" : "git status && git branch --show-current && echo target={{branch}}"
+  },
+  {
+    "arguments" : [
+    ],
+    "defaultWorkingDirectory" : null,
+    "environment" : {
+    },
+    "id" : "C0F7264F-E85D-448D-A2E2-0434D7E85DAA",
+    "name" : "Quick Batch Stub",
+    "runMode" : "batch",
+    "template" : "pwd\nwhoami\nswift --version"
+  }
+]
